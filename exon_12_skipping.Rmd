@@ -1,0 +1,2031 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(biomaRt)
+library(glmmTMB)
+library(emmeans)
+library(DHARMa)
+```
+
+```{r}
+install.packages("BiocManager")
+
+BiocManager::install(version = "3.22")
+
+BiocManager::install("biomaRt", force = TRUE)
+```
+
+
+```{r}
+junctions_breast <- recount3::create_rse_manual(
+    project = "BREAST",
+    project_home = "data_sources/gtex",
+    organism = "human",
+    annotation = "gencode_v29",
+    type = "jxn"
+)
+```
+```{r}
+sample_meta_breast <- as.data.frame(colData(junctions_breast))
+junction_counts_breast <- assay(junctions_breast, "counts")
+junction_coordinates_breast <- rowRanges(junctions_breast)
+junctions_breast_mlh1 <- which(
+    seqnames(junction_coordinates_breast) == "chr3" &
+    strand(junction_coordinates_breast) == "+" &
+    start(junction_coordinates_breast) >= 36970000 &
+    end(junction_coordinates_breast) <= 37060000
+)
+junctions_breast_mlh1.1 <- junctions_breast[junctions_breast_mlh1, ]
+junction_counts_breast_mlh1 <- assay(junctions_breast_mlh1.1, "counts")
+junction_counts_breast_mlh1_df <- as.data.frame(as.matrix(junction_counts_breast_mlh1))
+junctions_combined_breast_mlh1 <- data.frame(
+    chr = as.character(seqnames(rowRanges(junctions_breast_mlh1.1))),
+    start = start(rowRanges(junctions_breast_mlh1.1)),
+    end = end(rowRanges(junctions_breast_mlh1.1)),
+    strand = as.character(strand(rowRanges(junctions_breast_mlh1.1)))
+)
+
+junctions_combined_breast <- cbind(junctions_combined_breast_mlh1, junction_counts_breast_mlh1_df)
+```
+
+
+```{r}
+junctions_colon <- recount3::create_rse_manual(
+    project = "COLON",
+    project_home = "data_sources/gtex",
+    organism = "human",
+    annotation = "gencode_v29",
+    type = "jxn"
+)
+```
+```{r}
+sample_meta_colon <- as.data.frame(colData(junctions_colon))
+junction_counts_colon <- assay(junctions_colon, "counts")
+junction_coordinates_colon <- rowRanges(junctions_colon)
+junctions_colon_mlh1 <- which(
+    seqnames(junction_coordinates_colon) == "chr3" &
+    strand(junction_coordinates_colon) == "+" &
+    start(junction_coordinates_colon) >= 36970000 &
+    end(junction_coordinates_colon) <= 37060000
+)
+junctions_colon_mlh1.1 <- junctions_colon[junctions_colon_mlh1, ]
+junction_counts_colon_mlh1 <- assay(junctions_colon_mlh1.1, "counts")
+junction_counts_colon_mlh1_df <- as.data.frame(as.matrix(junction_counts_colon_mlh1))
+junctions_combined_colon_mlh1 <- data.frame(
+    chr = as.character(seqnames(rowRanges(junctions_colon_mlh1.1))),
+    start = start(rowRanges(junctions_colon_mlh1.1)),
+    end = end(rowRanges(junctions_colon_mlh1.1)),
+    strand = as.character(strand(rowRanges(junctions_colon_mlh1.1)))
+)
+
+junctions_combined_colon <- cbind(junctions_combined_colon_mlh1, junction_counts_colon_mlh1_df)
+```
+
+```{r}
+junctions_stomach <- recount3::create_rse_manual(
+    project = "STOMACH",
+    project_home = "data_sources/gtex",
+    organism = "human",
+    annotation = "gencode_v29",
+    type = "jxn"
+)
+```
+```{r}
+sample_meta_stomach <- as.data.frame(colData(junctions_stomach))
+junction_counts_stomach <- assay(junctions_stomach, "counts")
+junction_coordinates_stomach <- rowRanges(junctions_stomach)
+junctions_stomach_mlh1 <- which(
+    seqnames(junction_coordinates_stomach) == "chr3" &
+    strand(junction_coordinates_stomach) == "+" &
+    start(junction_coordinates_stomach) >= 36970000 &
+    end(junction_coordinates_stomach) <= 37060000
+)
+junctions_stomach_mlh1.1 <- junctions_stomach[junctions_stomach_mlh1, ]
+junction_counts_stomach_mlh1 <- assay(junctions_stomach_mlh1.1, "counts")
+junction_counts_stomach_mlh1_df <- as.data.frame(as.matrix(junction_counts_stomach_mlh1))
+junctions_combined_stomach_mlh1 <- data.frame(
+    chr = as.character(seqnames(rowRanges(junctions_stomach_mlh1.1))),
+    start = start(rowRanges(junctions_stomach_mlh1.1)),
+    end = end(rowRanges(junctions_stomach_mlh1.1)),
+    strand = as.character(strand(rowRanges(junctions_stomach_mlh1.1)))
+)
+
+junctions_combined_stomach <- cbind(junctions_combined_stomach_mlh1, junction_counts_stomach_mlh1_df)
+```
+
+```{r}
+junctions_pancreas <- recount3::create_rse_manual(
+    project = "PANCREAS",
+    project_home = "data_sources/gtex",
+    organism = "human",
+    annotation = "gencode_v29",
+    type = "jxn"
+)
+```
+```{r}
+sample_meta_pancreas <- as.data.frame(colData(junctions_pancreas))
+junction_counts_pancreas <- assay(junctions_pancreas, "counts")
+junction_coordinates_pancreas <- rowRanges(junctions_pancreas)
+junctions_pancreas_mlh1 <- which(
+    seqnames(junction_coordinates_pancreas) == "chr3" &
+    strand(junction_coordinates_pancreas) == "+" &
+    start(junction_coordinates_pancreas) >= 36970000 &
+    end(junction_coordinates_pancreas) <= 37060000
+)
+junctions_pancreas_mlh1.1 <- junctions_pancreas[junctions_pancreas_mlh1, ]
+junction_counts_pancreas_mlh1 <- assay(junctions_pancreas_mlh1.1, "counts")
+junction_counts_pancreas_mlh1_df <- as.data.frame(as.matrix(junction_counts_pancreas_mlh1))
+junctions_combined_pancreas_mlh1 <- data.frame(
+    chr = as.character(seqnames(rowRanges(junctions_pancreas_mlh1.1))),
+    start = start(rowRanges(junctions_pancreas_mlh1.1)),
+    end = end(rowRanges(junctions_pancreas_mlh1.1)),
+    strand = as.character(strand(rowRanges(junctions_pancreas_mlh1.1)))
+)
+
+junctions_combined_pancreas <- cbind(junctions_combined_pancreas_mlh1, junction_counts_pancreas_mlh1_df)
+```
+
+```{r}
+junctions_uterus <- recount3::create_rse_manual(
+    project = "UTERUS",
+    project_home = "data_sources/gtex",
+    organism = "human",
+    annotation = "gencode_v29",
+    type = "jxn"
+)
+```
+```{r}
+sample_meta_uterus <- as.data.frame(colData(junctions_uterus))
+junction_counts_uterus <- assay(junctions_uterus, "counts")
+junction_coordinates_uterus <- rowRanges(junctions_uterus)
+junctions_uterus_mlh1 <- which(
+    seqnames(junction_coordinates_uterus) == "chr3" &
+    strand(junction_coordinates_uterus) == "+" &
+    start(junction_coordinates_uterus) >= 36970000 &
+    end(junction_coordinates_uterus) <= 37060000
+)
+junctions_uterus_mlh1.1 <- junctions_uterus[junctions_uterus_mlh1, ]
+junction_counts_uterus_mlh1 <- assay(junctions_uterus_mlh1.1, "counts")
+junction_counts_uterus_mlh1_df <- as.data.frame(as.matrix(junction_counts_uterus_mlh1))
+junctions_combined_uterus_mlh1 <- data.frame(
+    chr = as.character(seqnames(rowRanges(junctions_uterus_mlh1.1))),
+    start = start(rowRanges(junctions_uterus_mlh1.1)),
+    end = end(rowRanges(junctions_uterus_mlh1.1)),
+    strand = as.character(strand(rowRanges(junctions_uterus_mlh1.1)))
+)
+
+junctions_combined_uterus <- cbind(junctions_combined_uterus_mlh1, junction_counts_uterus_mlh1_df)
+```
+
+```{r}
+junctions_liver <- recount3::create_rse_manual(
+    project = "LIVER",
+    project_home = "data_sources/gtex",
+    organism = "human",
+    annotation = "gencode_v29",
+    type = "jxn"
+)
+```
+```{r}
+sample_meta_liver <- as.data.frame(colData(junctions_liver))
+junction_counts_liver <- assay(junctions_liver, "counts")
+junction_coordinates_liver <- rowRanges(junctions_liver)
+junctions_liver_mlh1 <- which(
+    seqnames(junction_coordinates_liver) == "chr3" &
+    strand(junction_coordinates_liver) == "+" &
+    start(junction_coordinates_liver) >= 36970000 &
+    end(junction_coordinates_liver) <= 37060000
+)
+junctions_liver_mlh1.1 <- junctions_liver[junctions_liver_mlh1, ]
+junction_counts_liver_mlh1 <- assay(junctions_liver_mlh1.1, "counts")
+junction_counts_liver_mlh1_df <- as.data.frame(as.matrix(junction_counts_liver_mlh1))
+junctions_combined_liver_mlh1 <- data.frame(
+    chr = as.character(seqnames(rowRanges(junctions_liver_mlh1.1))),
+    start = start(rowRanges(junctions_liver_mlh1.1)),
+    end = end(rowRanges(junctions_liver_mlh1.1)),
+    strand = as.character(strand(rowRanges(junctions_liver_mlh1.1)))
+)
+
+junctions_combined_liver <- cbind(junctions_combined_liver_mlh1, junction_counts_liver_mlh1_df)
+```
+
+```{r}
+junctions_blood <- recount3::create_rse_manual(
+    project = "BLOOD",
+    project_home = "data_sources/gtex",
+    organism = "human",
+    annotation = "gencode_v29",
+    type = "jxn"
+)
+```
+```{r}
+sample_meta_blood <- as.data.frame(colData(junctions_blood))
+junction_counts_blood <- assay(junctions_blood, "counts")
+junction_coordinates_blood <- rowRanges(junctions_blood)
+junctions_blood_mlh1 <- which(
+    seqnames(junction_coordinates_blood) == "chr3" &
+    strand(junction_coordinates_blood) == "+" &
+    start(junction_coordinates_blood) >= 36970000 &
+    end(junction_coordinates_blood) <= 37060000
+)
+junctions_blood_mlh1.1 <- junctions_blood[junctions_blood_mlh1, ]
+junction_counts_blood_mlh1 <- assay(junctions_blood_mlh1.1, "counts")
+junction_counts_blood_mlh1_df <- as.data.frame(as.matrix(junction_counts_blood_mlh1))
+junctions_combined_blood_mlh1 <- data.frame(
+    chr = as.character(seqnames(rowRanges(junctions_blood_mlh1.1))),
+    start = start(rowRanges(junctions_blood_mlh1.1)),
+    end = end(rowRanges(junctions_blood_mlh1.1)),
+    strand = as.character(strand(rowRanges(junctions_blood_mlh1.1)))
+)
+
+junctions_combined_blood <- cbind(junctions_combined_blood_mlh1, junction_counts_blood_mlh1_df)
+```
+
+```{r}
+junctions_prostate <- recount3::create_rse_manual(
+    project = "PROSTATE",
+    project_home = "data_sources/gtex",
+    organism = "human",
+    annotation = "gencode_v29",
+    type = "jxn"
+)
+```
+```{r}
+sample_meta_prostate <- as.data.frame(colData(junctions_prostate))
+junction_counts_prostate <- assay(junctions_prostate, "counts")
+junction_coordinates_prostate <- rowRanges(junctions_prostate)
+junctions_prostate_mlh1 <- which(
+    seqnames(junction_coordinates_prostate) == "chr3" &
+    strand(junction_coordinates_prostate) == "+" &
+    start(junction_coordinates_prostate) >= 36970000 &
+    end(junction_coordinates_prostate) <= 37060000
+)
+junctions_prostate_mlh1.1 <- junctions_prostate[junctions_prostate_mlh1, ]
+junction_counts_prostate_mlh1 <- assay(junctions_prostate_mlh1.1, "counts")
+junction_counts_prostate_mlh1_df <- as.data.frame(as.matrix(junction_counts_prostate_mlh1))
+junctions_combined_prostate_mlh1 <- data.frame(
+    chr = as.character(seqnames(rowRanges(junctions_prostate_mlh1.1))),
+    start = start(rowRanges(junctions_prostate_mlh1.1)),
+    end = end(rowRanges(junctions_prostate_mlh1.1)),
+    strand = as.character(strand(rowRanges(junctions_prostate_mlh1.1)))
+)
+
+junctions_combined_prostate <- cbind(junctions_combined_prostate_mlh1, junction_counts_prostate_mlh1_df)
+```
+
+```{r}
+junctions_ovary <- recount3::create_rse_manual(
+    project = "OVARY",
+    project_home = "data_sources/gtex",
+    organism = "human",
+    annotation = "gencode_v29",
+    type = "jxn"
+)
+```
+```{r}
+sample_meta_ovary <- as.data.frame(colData(junctions_ovary))
+junction_counts_ovary <- assay(junctions_ovary, "counts")
+junction_coordinates_ovary <- rowRanges(junctions_ovary)
+junctions_ovary_mlh1 <- which(
+    seqnames(junction_coordinates_ovary) == "chr3" &
+    strand(junction_coordinates_ovary) == "+" &
+    start(junction_coordinates_ovary) >= 36970000 &
+    end(junction_coordinates_ovary) <= 37060000
+)
+junctions_ovary_mlh1.1 <- junctions_ovary[junctions_ovary_mlh1, ]
+junction_counts_ovary_mlh1 <- assay(junctions_ovary_mlh1.1, "counts")
+junction_counts_ovary_mlh1_df <- as.data.frame(as.matrix(junction_counts_ovary_mlh1))
+junctions_combined_ovary_mlh1 <- data.frame(
+    chr = as.character(seqnames(rowRanges(junctions_ovary_mlh1.1))),
+    start = start(rowRanges(junctions_ovary_mlh1.1)),
+    end = end(rowRanges(junctions_ovary_mlh1.1)),
+    strand = as.character(strand(rowRanges(junctions_ovary_mlh1.1)))
+)
+
+junctions_combined_ovary <- cbind(junctions_combined_ovary_mlh1, junction_counts_ovary_mlh1_df)
+```
+
+```{r}
+junctions_smallintestine <- recount3::create_rse_manual(
+    project = "SMALL_INTESTINE",
+    project_home = "data_sources/gtex",
+    organism = "human",
+    annotation = "gencode_v29",
+    type = "jxn"
+)
+```
+```{r}
+sample_meta_smallintestine <- as.data.frame(colData(junctions_smallintestine))
+junction_counts_smallintestine <- assay(junctions_smallintestine, "counts")
+junction_coordinates_smallintestine <- rowRanges(junctions_smallintestine)
+junctions_smallintestine_mlh1 <- which(
+    seqnames(junction_coordinates_smallintestine) == "chr3" &
+    strand(junction_coordinates_smallintestine) == "+" &
+    start(junction_coordinates_smallintestine) >= 36970000 &
+    end(junction_coordinates_smallintestine) <= 37060000
+)
+junctions_smallintestine_mlh1.1 <- junctions_smallintestine[junctions_smallintestine_mlh1, ]
+junction_counts_smallintestine_mlh1 <- assay(junctions_smallintestine_mlh1.1, "counts")
+junction_counts_smallintestine_mlh1_df <- as.data.frame(as.matrix(junction_counts_smallintestine_mlh1))
+junctions_combined_smallintestine_mlh1 <- data.frame(
+    chr = as.character(seqnames(rowRanges(junctions_smallintestine_mlh1.1))),
+    start = start(rowRanges(junctions_smallintestine_mlh1.1)),
+    end = end(rowRanges(junctions_smallintestine_mlh1.1)),
+    strand = as.character(strand(rowRanges(junctions_smallintestine_mlh1.1)))
+)
+
+junctions_combined_smallintestine <- cbind(junctions_combined_smallintestine_mlh1, junction_counts_smallintestine_mlh1_df)
+```
+
+```{r}
+saveRDS(junctions_combined_breast, file = "junctions_combined_breast.rds")
+saveRDS(sample_meta_breast, file = "sample_meta_breast.rds")
+
+saveRDS(junctions_combined_colon, file = "junctions_combined_colon.rds")
+saveRDS(sample_meta_colon, file = "sample_meta_colon.rds")
+
+saveRDS(junctions_combined_stomach, file = "junctions_combined_stomach.rds")
+saveRDS(sample_meta_stomach, file = "sample_meta_stomach.rds")
+
+saveRDS(junctions_combined_pancreas, file = "junctions_combined_pancreas.rds")
+saveRDS(sample_meta_pancreas, file = "sample_meta_pancreas.rds")
+
+saveRDS(junctions_combined_uterus, file = "junctions_combined_uterus.rds")
+saveRDS(sample_meta_uterus, file = "sample_meta_uterus.rds")
+
+saveRDS(junctions_combined_liver, file = "junctions_combined_liver.rds")
+saveRDS(sample_meta_liver, file = "sample_meta_liver.rds")
+
+saveRDS(junctions_combined_blood, file = "junctions_combined_blood.rds")
+saveRDS(sample_meta_blood, file = "sample_meta_blood.rds")
+
+saveRDS(junctions_combined_prostate, file = "junctions_combined_prostate.rds")
+saveRDS(sample_meta_prostate, file = "sample_meta_prostate.rds")
+
+saveRDS(junctions_combined_ovary, file = "junctions_combined_ovary.rds")
+saveRDS(sample_meta_ovary, file = "sample_meta_ovary.rds")
+
+saveRDS(junctions_combined_smallintestine, file = "junctions_combined_smallintestine.rds")
+saveRDS(sample_meta_smallintestine, file = "sample_meta_smallintestine.rds")
+```
+
+```{r}
+junctions_combined_breast <- readRDS("junctions_combined_breast.rds")
+sample_meta_breast <- readRDS("sample_meta_breast.rds")
+
+junctions_combined_colon <- readRDS("junctions_combined_colon.rds")
+sample_meta_colon <- readRDS("sample_meta_colon.rds")
+
+junctions_combined_stomach <- readRDS("junctions_combined_stomach.rds")
+sample_meta_stomach <- readRDS("sample_meta_stomach.rds")
+
+junctions_combined_pancreas <- readRDS("junctions_combined_pancreas.rds")
+sample_meta_pancreas <- readRDS("sample_meta_pancreas.rds")
+
+junctions_combined_uterus <- readRDS("junctions_combined_uterus.rds")
+sample_meta_uterus <- readRDS("sample_meta_uterus.rds")
+
+junctions_combined_liver <- readRDS("junctions_combined_liver.rds")
+sample_meta_liver <- readRDS("sample_meta_liver.rds")
+
+junctions_combined_blood <- readRDS("junctions_combined_blood.rds")
+sample_meta_blood <- readRDS("sample_meta_blood.rds")
+
+junctions_combined_prostate <- readRDS("junctions_combined_prostate.rds")
+sample_meta_prostate <- readRDS("sample_meta_prostate.rds")
+
+junctions_combined_ovary <- readRDS("junctions_combined_ovary.rds")
+sample_meta_ovary <- readRDS("sample_meta_ovary.rds")
+
+junctions_combined_smallintestine <- readRDS("junctions_combined_smallintestine.rds")
+sample_meta_smallintestine <- readRDS("sample_meta_smallintestine.rds")
+```
+
+```{r}
+sample_meta_wholeblood <- sample_meta_blood %>% filter(gtex.smtsd == "Whole Blood")
+```
+
+
+```{r}
+sample_meta_combined <- rbind(sample_meta_breast, sample_meta_colon, sample_meta_stomach, sample_meta_pancreas, sample_meta_uterus, sample_meta_liver, sample_meta_prostate, sample_meta_ovary, sample_meta_smallintestine, sample_meta_wholeblood)
+```
+
+```{r}
+sample_meta_combined %>%
+  dplyr::group_by(gtex.subjid) %>%
+  dplyr::summarise(n_hrdy = dplyr::n_distinct(gtex.dthhrdy)) %>%
+  dplyr::filter(n_hrdy > 1)
+```
+
+```{r}
+donor_hrdy <- sample_meta_combined %>%
+  dplyr::distinct(gtex.subjid, gtex.dthhrdy)
+
+table(donor_hrdy$gtex.dthhrdy, useNA = "ifany")
+
+# the Na values from the 15 donors kept in downstream analysis
+
+```
+```{r}
+length(unique(sample_meta_combined$gtex.subjid))
+```
+```{r}
+sample_meta_combined %>%
+  dplyr::group_by(gtex.subjid) %>%
+  dplyr::summarise(n_sex = n_distinct(gtex.sex)) %>%
+  dplyr::filter(n_sex > 1)
+```
+
+
+```{r}
+donor_sex <- sample_meta_combined %>%
+  dplyr::group_by(gtex.subjid) %>%
+  dplyr::summarise(sex = first(gtex.sex), .groups = "drop")
+table(donor_sex$sex)
+```
+
+
+
+```{r}
+sample_meta_combined %>%
+  dplyr::group_by(gtex.subjid) %>%
+  dplyr::summarise(n_age = dplyr::n_distinct(gtex.age)) %>%
+  dplyr::filter(n_age > 1)
+```
+```{r}
+donor_age <- sample_meta_combined %>%
+  dplyr::distinct(gtex.subjid, gtex.age)
+
+table(donor_age$gtex.age, useNA = "ifany")
+```
+```{r}
+duplicate_groups <- sample_meta_combined %>% group_by(gtex.subjid, gtex.smtsd) %>% filter(n() > 1) %>% arrange(gtex.subjid, gtex.smtsd) 
+```
+
+```{r}
+sample_meta_combined_filtered <- sample_meta_combined %>%
+  
+  # 1. First remove exact duplicates within the same gtex.sampid
+  group_by(gtex.sampid) %>%
+  slice(1) %>%
+  ungroup() %>%
+  
+  # 2. Then resolve remaining replicate groups (same donor + same tissue)
+  group_by(gtex.subjid, gtex.smtsd) %>%
+  arrange(
+    desc(recount_qc.junction_avg_coverage),
+    desc(recount_qc.star.uniquely_mapped_reads_.),
+    .by_group = TRUE
+  ) %>%
+  slice(1) %>%
+  ungroup()
+```
+
+
+```{r}
+# making my own junction_id's (are unique for each junction)
+junctions_combined_breast <- junctions_combined_breast %>%
+  mutate(junction_id = paste0(start, end)) %>%
+  relocate(junction_id, .before = 1)
+
+junctions_combined_colon <- junctions_combined_colon %>%
+  mutate(junction_id = paste0(start, end)) %>%
+  relocate(junction_id, .before = 1)
+
+junctions_combined_stomach <- junctions_combined_stomach %>%
+  mutate(junction_id = paste0(start, end)) %>%
+  relocate(junction_id, .before = 1)
+
+junctions_combined_pancreas <- junctions_combined_pancreas %>%
+  mutate(junction_id = paste0(start, end)) %>%
+  relocate(junction_id, .before = 1)
+
+junctions_combined_uterus <- junctions_combined_uterus %>%
+  mutate(junction_id = paste0(start, end)) %>%
+  relocate(junction_id, .before = 1)
+
+junctions_combined_liver <- junctions_combined_liver %>%
+  mutate(junction_id = paste0(start, end)) %>%
+  relocate(junction_id, .before = 1)
+
+junctions_combined_blood <- junctions_combined_blood %>%
+  mutate(junction_id = paste0(start, end)) %>%
+  relocate(junction_id, .before = 1)
+
+junctions_combined_prostate <- junctions_combined_prostate %>%
+  mutate(junction_id = paste0(start, end)) %>%
+  relocate(junction_id, .before = 1)
+
+junctions_combined_ovary <- junctions_combined_ovary %>%
+  mutate(junction_id = paste0(start, end)) %>%
+  relocate(junction_id, .before = 1)
+
+junctions_combined_smallintestine <- junctions_combined_smallintestine %>%
+  mutate(junction_id = paste0(start, end)) %>%
+  relocate(junction_id, .before = 1)
+```
+
+```{r}
+merge_junctions_function <- function(df1, df2,
+                             suffix1 = ".df1",
+                             suffix2 = ".df2") {
+
+  # Metadata columns
+  meta_cols <- c("junction_id", "chr", "start", "end", "strand")
+
+  # Full join
+  merged_df <- full_join(
+    df1,
+    df2,
+    by = "junction_id",
+    suffix = c(suffix1, suffix2)
+  )
+
+  # Merge metadata columns
+  for(col in c("chr", "start", "end", "strand")) {
+
+    col1 <- paste0(col, suffix1)
+    col2 <- paste0(col, suffix2)
+
+    merged_df[[col]] <- coalesce(
+      merged_df[[col1]],
+      merged_df[[col2]]
+    )
+  }
+
+  # Remove duplicated metadata columns
+  cols_to_remove <- c()
+
+  for(col in c("chr", "start", "end", "strand")) {
+    cols_to_remove <- c(
+      cols_to_remove,
+      paste0(col, suffix1),
+      paste0(col, suffix2)
+    )
+  }
+
+  merged_df <- merged_df %>%
+    dplyr::select(
+      junction_id,
+      chr,
+      start,
+      end,
+      strand,
+      everything(),
+      -all_of(cols_to_remove)
+    )
+
+  # Replace NA with 0 in non-metadata columns
+  non_meta_cols <- setdiff(colnames(merged_df), meta_cols)
+
+  merged_df <- merged_df %>%
+    dplyr::mutate(
+      across(
+        all_of(non_meta_cols),
+        ~replace_na(., 0)
+      )
+    )
+
+  return(merged_df)
+}
+# per tissue group i equated the junctions that were not present in tissue group x but were present in the one or more of the other tissue groups to zero for the each sample of tissue group x
+```
+
+```{r}
+merged_junctions1 <- merge_junctions_function(
+  junctions_combined_breast,
+  junctions_combined_colon,
+  ".breast",
+  ".colon"
+)
+```
+
+```{r}
+merged_junctions2 <- merge_junctions_function(
+  merged_junctions1,
+  junctions_combined_stomach,
+  ".junctions1",
+  ".stomach"
+)
+```
+
+```{r}
+merged_junctions3 <- merge_junctions_function(
+  merged_junctions2,
+  junctions_combined_pancreas,
+  ".junctions2",
+  ".pancreas"
+)
+```
+
+```{r}
+merged_junctions4 <- merge_junctions_function(
+  merged_junctions3,
+  junctions_combined_liver,
+  ".junctions3",
+  ".liver"
+)
+```
+
+```{r}
+merged_junctions5 <- merge_junctions_function(
+  merged_junctions4,
+  junctions_combined_uterus,
+  ".junctions4",
+  ".uterus"
+)
+```
+
+```{r}
+merged_junctions6 <- merge_junctions_function(
+  merged_junctions5,
+  junctions_combined_ovary,
+  ".junctions5",
+  ".ovary"
+)
+```
+
+```{r}
+merged_junctions7 <- merge_junctions_function(
+  merged_junctions6,
+  junctions_combined_smallintestine,
+  ".junctions6",
+  ".smallintestine"
+)
+```
+
+```{r}
+merged_junctions8 <- merge_junctions_function(
+  merged_junctions7,
+  junctions_combined_blood,
+  ".junctions7",
+  ".blood"
+)
+```
+
+```{r}
+merged_junctions_complete <- merge_junctions_function(
+  merged_junctions8,
+  junctions_combined_prostate,
+  ".junctions8",
+  ".prostate"
+)
+```
+
+```{r}
+junctions_merged_complete_metadata <- merged_junctions_complete %>%
+  dplyr::select(1:5)
+```
+
+```{r}
+#start and end of the junctions are also the first base  and last base of the cannonical donor and acceptor dinucleotides respectively -> two extra columns called donor_pos and acceptor_pos 
+junctions_merged_complete_metadata$donor_pos <- junctions_merged_complete_metadata$start
+junctions_merged_complete_metadata$acceptor_pos <- junctions_merged_complete_metadata$end
+```
+
+```{r}
+mart <- useEnsembl(
+  biomart = "genes",
+  dataset = "hsapiens_gene_ensembl",
+  host = "https://www.ensembl.org"
+)
+```
+
+```{r}
+MLH1_exons_recount3 <- getBM(
+  attributes = c(
+    "chromosome_name",
+    "exon_chrom_start",
+    "exon_chrom_end",
+    "strand",
+    "ensembl_transcript_id",
+    "ensembl_exon_id"
+  ),
+  filters = "external_gene_name",
+  values = "MLH1",
+  mart = mart
+)
+```
+
+```{r}
+colnames(MLH1_exons_recount3) <- c(
+  "chrom",
+  "start",
+  "end",
+  "strand",
+  "tx_id",
+  "exon_id"
+)
+```
+
+```{r}
+MLH1_exons_recount3 <- MLH1_exons_recount3[order(MLH1_exons_recount3$tx_id, MLH1_exons_recount3$start), ]
+```
+
+```{r}
+MLH1_exons_recount3$exon_index <- ave(
+  MLH1_exons_recount3$start,
+  MLH1_exons_recount3$tx_id,
+  FUN = seq_along
+)
+```
+
+```{r}
+MLH1_exons_recount3$donor_pos <- MLH1_exons_recount3$end + 1
+MLH1_exons_recount3$acceptor_pos <- MLH1_exons_recount3$start - 1
+```
+
+```{r}
+cannonical_donorsites_recount3 <- MLH1_exons_recount3[, c("chrom", "tx_id", "exon_index", "donor_pos")]
+colnames(cannonical_donorsites_recount3)[4] <- "pos"
+cannonical_donorsites_recount3$type <- "donor"
+
+cannonical_acceptorsites_recount3 <- MLH1_exons_recount3[, c("chrom", "tx_id", "exon_index", "acceptor_pos")]
+colnames(cannonical_acceptorsites_recount3)[4] <- "pos"
+cannonical_acceptorsites_recount3$type <- "acceptor"
+```
+
+```{r}
+donor_matches_recount3 <- merge(
+  junctions_merged_complete_metadata,
+  cannonical_donorsites_recount3,
+  by.x = "donor_pos",
+  by.y = "pos",
+  all.x = TRUE
+)
+
+acceptor_matches_recount3 <- merge(
+  junctions_merged_complete_metadata,
+  cannonical_acceptorsites_recount3,
+  by.x = "acceptor_pos",
+  by.y = "pos",
+  all.x = TRUE
+)
+```
+
+```{r}
+donor_matches_clean_recount3 <- donor_matches_recount3 %>%
+  dplyr::select(
+    junction_id,
+    donor_pos,
+    acceptor_pos,
+    start,
+    end,
+    donor_tx = tx_id,
+    donor_exon = exon_index
+  )
+
+#selecting the columns that are needed and renaming two others
+acceptor_matches_clean_recount3 <- acceptor_matches_recount3 %>%
+  dplyr::select(
+    junction_id,
+    donor_pos,
+    acceptor_pos,
+    acceptor_tx = tx_id,
+    acceptor_exon = exon_index
+  )
+```
+
+```{r}
+junctions_merged_recount3 <- junctions_merged_complete_metadata %>%
+  dplyr::left_join(
+    donor_matches_clean_recount3,
+    by = c("donor_pos", "acceptor_pos")
+  ) %>%
+  dplyr::left_join(
+    acceptor_matches_clean_recount3,
+    by = c("donor_pos", "acceptor_pos")
+  )
+```
+```{r}
+junctions_eventclass_recount3 <- junctions_merged_recount3 %>%
+  dplyr::mutate(
+    donor_annotated    = !is.na(donor_exon),
+    acceptor_annotated = !is.na(acceptor_exon),
+    exon_diff = acceptor_exon - donor_exon,
+
+    event_class = dplyr::case_when(
+
+      donor_annotated & acceptor_annotated & donor_tx == acceptor_tx & exon_diff == 1 ~
+        "normal splicing",
+
+      donor_annotated & acceptor_annotated & donor_tx == acceptor_tx & exon_diff > 1 ~
+        "exon skipping",
+
+      donor_annotated & acceptor_annotated & donor_tx != acceptor_tx ~
+        "cryptic donor/acceptor and canonical junction",
+
+      !donor_annotated & acceptor_annotated ~
+        "cryptic donor",
+
+      donor_annotated & !acceptor_annotated ~
+        "cryptic acceptor",
+
+      !donor_annotated & !acceptor_annotated ~
+        "novel",
+
+      TRUE ~ "other"
+    ),
+    skipped_exons = dplyr::case_when(
+      exon_diff > 1 ~ exon_diff - 1,
+      TRUE ~ 0
+    )
+  )
+```
+
+```{r}
+names_of_cols_to_remove <- sample_meta_blood %>%
+  filter(gtex.smtsd != "Whole Blood") %>%
+  dplyr::select(external_id, gtex.smtsd)
+```
+
+```{r}
+cols_to_remove <- names_of_cols_to_remove$external_id
+merged_junctions_complete_filtered <- merged_junctions_complete %>%
+  dplyr::select(-any_of(cols_to_remove))
+```
+
+```{r}
+normalsplicing_ENST00000231790_recount3 <- junctions_eventclass_recount3 %>%
+  dplyr::filter(event_class == "normal splicing", donor_tx == "ENST00000231790")
+
+exonskipping_ENST00000231790_recount3 <- junctions_eventclass_recount3 %>%
+  dplyr::filter(event_class == "exon skipping", donor_tx == "ENST00000231790")
+```
+```{r}
+crypticdonor_ENST00000231790_recount3 <- junctions_eventclass_recount3 %>%
+  dplyr::filter(event_class == "cryptic donor")
+```
+
+
+```{r}
+# merge the dataframe with exon skipping junctions and normal splicing junctions with the dataframe containing the sample columns and read counts
+merged_exonskipping <- exonskipping_ENST00000231790_recount3 %>%
+  left_join(
+    merged_junctions_complete_filtered,
+    by = "junction_id"
+  )
+merged_normalsplicing <- normalsplicing_ENST00000231790_recount3 %>%
+  left_join(
+    merged_junctions_complete_filtered,
+    by = "junction_id"
+  )
+```
+
+
+```{r}
+# create the columns samples_count_all, coverage_sum_all, coverage_avg_all and coverage_median_all 
+sample_cols_merged_exonskipping <- colnames(merged_exonskipping)[25:ncol(merged_exonskipping)]
+
+merged_exonskipping <- merged_exonskipping %>%
+  rowwise() %>%
+  mutate(
+    samples_count_all = sum(c_across(all_of(sample_cols_merged_exonskipping)) >= 1, na.rm = TRUE),
+
+    coverage_sum_all = sum(c_across(all_of(sample_cols_merged_exonskipping)), na.rm = TRUE),
+
+    coverage_avg_all = {
+      vals <- c_across(all_of(sample_cols_merged_exonskipping))
+      vals <- vals[vals >= 1]
+      if (length(vals) == 0) 0 else mean(vals)
+    },
+
+    coverage_median_all = {
+      vals <- c_across(all_of(sample_cols_merged_exonskipping))
+      vals <- vals[vals >= 1]
+      if (length(vals) == 0) 0 else median(vals)
+    }
+  ) %>%
+  ungroup() %>%
+  relocate(
+    samples_count_all,
+    coverage_sum_all,
+    coverage_avg_all,
+    coverage_median_all,
+    .after = 24
+  )
+```
+
+```{r}
+# create the columns samples_count_all, coverage_sum_all, coverage_avg_all and coverage_median_all 
+sample_cols_merged_normalsplicing <- colnames(merged_normalsplicing)[25:ncol(merged_normalsplicing)]
+
+merged_normalsplicing <- merged_normalsplicing %>%
+  rowwise() %>%
+  mutate(
+    samples_count_all = sum(c_across(all_of(sample_cols_merged_normalsplicing)) >= 1, na.rm = TRUE),
+
+    coverage_sum_all = sum(c_across(all_of(sample_cols_merged_normalsplicing)), na.rm = TRUE),
+
+    coverage_avg_all = {
+      vals <- c_across(all_of(sample_cols_merged_normalsplicing))
+      vals <- vals[vals >= 1]
+      if (length(vals) == 0) 0 else mean(vals)
+    },
+
+    coverage_median_all = {
+      vals <- c_across(all_of(sample_cols_merged_normalsplicing))
+      vals <- vals[vals >= 1]
+      if (length(vals) == 0) 0 else median(vals)
+    }
+  ) %>%
+  ungroup() %>%
+  relocate(
+    samples_count_all,
+    coverage_sum_all,
+    coverage_avg_all,
+    coverage_median_all,
+    .after = 24
+  )
+```
+
+
+```{r}
+merged_exonskipping <- merged_exonskipping %>%
+  dplyr::select(-start.y, -end.y, -junction_id.y, -chr.y, -strand.y, -junction_id, -start, -end, -exon_diff)
+
+merged_normalsplicing <- merged_normalsplicing %>%
+  dplyr::select(-start.y, -end.y, -junction_id.y, -chr.y, -strand.y, -junction_id, -start, -end, -exon_diff)
+```
+
+```{r}
+# convert into a long format
+merged_exonskipping_long <- merged_exonskipping %>%
+  pivot_longer(
+    cols = -(1:19),
+    names_to = "sample",
+    values_to = "read_counts"
+  )
+
+merged_normalsplicing_long <- merged_normalsplicing %>%
+  pivot_longer(
+    cols = -(1:19),
+    names_to = "sample",
+    values_to = "read_counts"
+  )
+```
+
+```{r}
+merged_exonskipping_long <- merged_exonskipping_long %>%
+  inner_join(
+    sample_meta_combined_filtered %>%
+      dplyr::select(external_id, gtex.smtsd, gtex.subjid, gtex.age,  `recount_qc.star.uniquely_mapped_reads_._both`, gtex.sex,  recount_qc.bc_auc.all_reads_annotated_bases, recount_qc.junction_avg_coverage, gtex.smrin, gtex.smnabtch, gtex.smgebtch, gtex.dthhrdy),
+    by = c("sample" = "external_id")
+  )
+
+merged_normalsplicing_long <- merged_normalsplicing_long %>%
+  inner_join(
+    sample_meta_combined_filtered %>%
+      dplyr::select(external_id, gtex.smtsd, gtex.subjid, gtex.age,  `recount_qc.star.uniquely_mapped_reads_._both`, gtex.sex,  recount_qc.bc_auc.all_reads_annotated_bases, recount_qc.junction_avg_coverage, gtex.smrin, gtex.smnabtch, gtex.smgebtch, gtex.dthhrdy),
+    by = c("sample" = "external_id")
+  )
+```
+
+```{r}
+merged_normalsplicing_long <- merged_normalsplicing_long %>%
+  dplyr::select(-chr.x, -strand.x)
+merged_exonskipping_long <- merged_exonskipping_long %>%
+  dplyr::select(-chr.x, -strand.x)
+```
+
+```{r}
+saveRDS(merged_normalsplicing_long, file = "merged_normalsplicing_long.rds")
+saveRDS(merged_exonskipping_long, file = "merged_exonskipping_long.rds")
+```
+```{r}
+merged_normalsplicing_long <- readRDS("merged_normalsplicing_long.rds")
+merged_exonskipping_long <- readRDS("merged_exonskipping_long.rds")
+```
+
+```{r}
+exon12skip_filteredtissues <- merged_exonskipping_long %>% dplyr::filter(donor_exon == 11, acceptor_exon == 13)
+intron11_12_filteredtissues <- merged_normalsplicing_long %>% dplyr::filter(donor_exon == 12 | acceptor_exon == 12)
+```
+
+```{r}
+combined_filteredtissues <- bind_rows(intron11_12_filteredtissues, exon12skip_filteredtissues)
+combined_filteredtissues_ordered <- combined_filteredtissues %>%
+  mutate(order_rank = case_when(
+    end.x == 37025636 ~ 1,
+    start.x == 37026008 ~ 2,
+    skipped_exons == 1 ~ 3,
+    TRUE ~ 4
+  )) %>%
+  arrange(sample, order_rank) %>%
+  dplyr::select(-order_rank)
+# order the events : per rail_id, first row is intron 11 split read count, second row is intron 12 split read count, third row is exon 12 split read count
+
+combined_filteredtissues_ordered <- combined_filteredtissues_ordered %>% dplyr::select(start.x, end.x, junction_id.x, donor_exon, acceptor_exon, event_class, gtex.subjid, read_counts, gtex.smtsd, gtex.sex, gtex.age, recount_qc.bc_auc.all_reads_annotated_bases, sample, `recount_qc.star.uniquely_mapped_reads_._both`, recount_qc.junction_avg_coverage, gtex.smrin, gtex.smnabtch, gtex.smgebtch, gtex.dthhrdy)
+# select only the required columns to make the dataframe simpler
+
+```
+```{r}
+any(is.na(combined_filteredtissues_ordered))
+#check for any NA's -> must return FALSE
+na_cols_exon12 <- combined_filteredtissues_ordered %>%
+  dplyr::select(where(~ any(is.na(.))))
+na_rows_exon12 <- combined_filteredtissues_ordered %>%
+  filter(if_any(everything(), is.na))
+# only Na's in gtex.dthhrry
+```
+
+```{r}
+combined_filteredtissues_ordered <- combined_filteredtissues_ordered %>%
+  mutate(junction_type = case_when(
+    junction_id.x == 3702046437025636 ~ "11_12",
+    junction_id.x == 3702600837028783 ~ "12_13",
+    junction_id.x == 3702046437028783 ~ "11_13",
+    TRUE ~ NA_character_
+  )) %>%
+  dplyr::select(-donor_exon, -acceptor_exon)
+```
+
+```{r}
+combined_filteredtissues_ordered <- combined_filteredtissues_ordered %>%
+  mutate(order_rank = case_when(
+    end.x == 37025636 ~ 1,
+    start.x == 37026008 ~ 2,
+    event_class == "exon skipping" ~ 3,
+    TRUE ~ 4
+  )) %>%
+  arrange(sample, order_rank) %>%
+  dplyr::select(-order_rank)
+```
+
+```{r}
+onerow_per_sample_exon12 <- combined_filteredtissues_ordered %>%
+  dplyr::group_by(sample) %>%
+  dplyr::summarise(
+    inc_11_12 = read_counts[junction_type == "11_12"],
+    inc_12_13 = read_counts[junction_type == "12_13"],
+    total_inclusion = sum(
+      read_counts[junction_type == "11_12"] +
+      read_counts[junction_type == "12_13"],
+      na.rm = TRUE),
+    skipping = read_counts[junction_type == "11_13"],
+    
+    SEX = gtex.sex[!is.na(gtex.sex)][1],
+    AGE = gtex.age[!is.na(gtex.age)][1],
+    SUBJID = gtex.subjid[!is.na(gtex.subjid)][1],
+    SMTSD = gtex.smtsd[!is.na(gtex.smtsd)][1],
+    bc_auc.all_reads_annotated_bases =
+      recount_qc.bc_auc.all_reads_annotated_bases[!is.na(recount_qc.bc_auc.all_reads_annotated_bases)][1],
+    `star.uniquely_mapped_reads_%_both` = `recount_qc.star.uniquely_mapped_reads_._both`[!is.na(`recount_qc.star.uniquely_mapped_reads_._both`)][1],
+    junction_avg_coverage = recount_qc.junction_avg_coverage[!is.na(recount_qc.junction_avg_coverage)][1],
+    RIN_number = gtex.smrin[!is.na(gtex.smrin)][1],
+    Nucleic_acid_isolation_batch = gtex.smnabtch[!is.na(gtex.smnabtch)][1],
+    Genotype_or_expression_batch = gtex.smgebtch[!is.na(gtex.smgebtch)][1],
+    Classification_death = gtex.dthhrdy[!is.na(gtex.dthhrdy)][1],
+    
+    .groups = "drop"
+  )
+```
+
+```{r}
+replicates <- onerow_per_sample_exon12 %>%
+  group_by(SUBJID, SMTSD) %>%
+  filter(n() >= 2) %>%
+  ungroup()
+```
+
+```{r}
+merged_onerow_per_sample_exon12 <- onerow_per_sample_exon12 %>%
+  left_join(
+    mlh1_alltissues_cpm %>%
+      dplyr::select(sample_id, mlh1_cpm, raw_counts),
+    by = c("sample" = "sample_id")
+  )
+```
+
+```{r}
+merged_onerow_per_sample_exon12$AGE <- as.factor(merged_onerow_per_sample_exon12$AGE)
+merged_onerow_per_sample_exon12$SEX <- as.factor(merged_onerow_per_sample_exon12$SEX)
+merged_onerow_per_sample_exon12$Classification_death <- as.factor(merged_onerow_per_sample_exon12$Classification_death)
+```
+
+```{r}
+quantile(merged_onerow_per_sample_exon12$total_inclusion, probs = c(0.1, 0.25, 0.5, 0.75))
+```
+```{r}
+merged_onerow_per_sample_exon12_filtered <- merged_onerow_per_sample_exon12 %>%
+  filter(total_inclusion > 25)
+```
+
+```{r}
+table(merged_onerow_per_sample_exon12$SMTSD)
+# look how many samples per tissue are left over after filtering
+
+table(merged_onerow_per_sample_exon12_filtered$SMTSD)
+# look how many samples per tissue are left over after filtering
+```
+
+```{r}
+saveRDS(normalsplicing_ENST00000231790_recount3, file = "normalsplicing_ENST00000231790_recount3.rds")
+saveRDS(exonskipping_ENST00000231790_recount3, file = "exonskipping_ENST00000231790_recount3")
+saveRDS(merged_normalsplicing_long, file = "merged_normalsplicing_long.rds")
+saveRDS(merged_exonskipping_long, file = "merged_exonskipping_long.rds")
+```
+
+```{r}
+# convert the missing expression batch values into Na!
+
+merged_onerow_per_sample_exon12$Genotype_or_expression_batch[
+  merged_onerow_per_sample_exon12$Genotype_or_expression_batch == ""
+] <- NA
+```
+
+```{r}
+merged_onerow_per_sample_exon12 <- merged_onerow_per_sample_exon12 %>%
+  mutate(average_inclusion = total_inclusion / 2,
+         .after = 4)
+```
+
+
+```{r}
+saveRDS(merged_onerow_per_sample_exon12_filtered, file = "merged_onerow_per_sample_exon12_filtered.rds")
+saveRDS(merged_onerow_per_sample_exon12, file = "merged_onerow_per_sample_exon12.rds")
+```
+
+```{r}
+normalsplicing_ENST00000231790_recount3 <- readRDS("normalsplicing_ENST00000231790_recount3.rds")
+
+exonskipping_ENST00000231790_recount3 <- readRDS("exonskipping_ENST00000231790_recount3.rds")
+```
+
+
+```{r}
+merged_normalsplicing_long <- readRDS("merged_normalsplicing_long.rds")
+
+merged_exonskipping_long <- readRDS("merged_exonskipping_long.rds")
+
+merged_onerow_per_sample_exon12_filtered <- readRDS("merged_onerow_per_sample_exon12_filtered.rds")
+```
+
+
+```{r}
+merged_onerow_per_sample_exon12 <- readRDS("merged_onerow_per_sample_exon12.rds")
+```
+
+```{r}
+# unfiltered model without all the covariats (simplest model)
+
+simplest_model_exon12 <- glmmTMB(
+  cbind(skipping, total_inclusion) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    (1 | SUBJID),
+  
+  family = betabinomial(),
+  data = merged_onerow_per_sample_exon12
+)
+
+emm_tmb_simplest_model_exon12 <- emmeans(simplest_model_exon12, ~ SMTSD)
+pairs_tmb_simplest_model_exon12<- pairs(emm_tmb_simplest_model_exon12, adjust = "BH")
+simplest_model_exon12
+pairs_tmb_simplest_model_exon12
+```
+
+```{r}
+emm_thisplot_simplest_model_exon12 <- emmeans(simplest_model_exon12, ~ SMTSD, type = "response")
+emm_thisplot_simplest_model_exon12_df <- as.data.frame(emm_thisplot_simplest_model_exon12)
+breast_prob_simplest_model_exon12 <- emm_thisplot_simplest_model_exon12_df$prob[emm_thisplot_simplest_model_exon12_df$SMTSD == "Breast - Mammary Tissue"]
+
+emm_thisplot_simplest_model_exon12_df <- emm_thisplot_simplest_model_exon12_df %>%
+  mutate(
+    fold_vs_breast = breast_prob_simplest_model_exon12 / prob
+  )
+```
+
+```{r}
+model_tmb_exon12_intron11_mainmodel <- glmmTMB(
+  cbind(skipping, inc_11_12) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    RIN_number + 
+    (1 | SUBJID),
+  
+  family = betabinomial(),
+  data = merged_onerow_per_sample_exon12
+)
+
+emm_tmb_exon12_intron11_mainmodel <- emmeans(model_tmb_exon12_intron11_mainmodel, ~ SMTSD)
+pairs_tmb_exon12_intron11_mainmodel <- pairs(emm_tmb_exon12_intron11_mainmodel, adjust = "BH")
+model_tmb_exon12_intron11_mainmodel
+pairs_tmb_exon12_intron11_mainmodel
+```
+
+```{r}
+emm_thisplot_exon12_intron11_mainmodel <- emmeans(model_tmb_exon12_intron11_mainmodel, ~ SMTSD, type = "response")
+emm_thisplot_exon12_intron11_mainmodel_df <- as.data.frame(emm_thisplot_exon12_intron11_mainmodel)
+breast_prob_exon12_intron11_mainmodel <- emm_thisplot_exon12_intron11_mainmodel_df$prob[emm_thisplot_exon12_intron11_mainmodel_df$SMTSD == "Breast - Mammary Tissue"]
+
+emm_thisplot_exon12_intron11_mainmodel_df <- emm_thisplot_exon12_intron11_mainmodel_df %>%
+  mutate(
+    fold_vs_breast = breast_prob_exon12_intron11_mainmodel / prob
+  )
+emm_thisplot_exon12_intron11_mainmodel_df
+```
+
+
+
+```{r}
+# plot with distribution of read counts across tissues
+dist_exact_simplest_model_exon12 <- merged_onerow_per_sample_exon12 %>%
+  group_by(SMTSD, skipping) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(SMTSD) %>%
+  mutate(
+    total_tissue = sum(n),
+    pct = 100 * n / total_tissue
+  )
+
+ggplot(dist_exact_simplest_model_exon12, aes(x = factor(skipping), y = pct)) +
+  geom_col(fill = "steelblue", width = 1.0) +
+  geom_text(
+    aes(label = sprintf("%.1f%%", pct)),
+    vjust = -0.3,
+    size = 1.5
+  ) +
+  facet_wrap(~ SMTSD) +
+  theme_classic() +
+  labs(
+    x = "Exon 12 skipping read count",
+    y = "Percentage of samples within tissue"
+  ) +
+  ylim(0, max(dist_exact_simplest_model_exon12$pct) * 1.1)
+```
+```{r}
+dist_exact_simplest_model_exon12 <- merged_onerow_per_sample_exon12 %>%
+  group_by(SMTSD, skipping) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(SMTSD) %>%
+  mutate(
+    total_tissue = sum(n),
+    pct = 100 * n / total_tissue
+  )
+
+ggplot(dist_exact_simplest_model_exon12, aes(x = factor(skipping), y = pct)) +
+  geom_col(fill = "steelblue", width = 1.0) +
+  geom_text(
+    aes(label = sprintf("%.1f", pct)),
+    vjust = -0.3,
+    size = 2.5
+  ) +
+  facet_wrap(~ SMTSD) +
+  theme_classic() +
+  labs(
+    x = "Exon 12 skipping read count",
+    y = "Percentage of samples within tissue"
+  ) +
+  ylim(0, max(dist_exact_simplest_model_exon12$pct) * 1.1)
+```
+
+
+```{r}
+dist_exact_simplest_model_exon12 <- merged_onerow_per_sample_exon12 %>%
+  mutate(
+    psi_sum = skipping / (skipping + total_inclusion),
+    psi_bin = cut(
+      psi_sum,
+      breaks = c(
+        0,
+        0.001,
+        0.005,
+        0.01,
+        0.02,
+        0.05,
+        0.1,
+        0.2,
+        1
+      ),
+      include.lowest = TRUE
+    )
+  ) %>%
+  group_by(SMTSD, psi_bin) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(SMTSD) %>%
+  mutate(pct = 100 * n / sum(n))
+
+ggplot(dist_exact_simplest_model_exon12, aes(x = psi_bin, y = pct)) +
+  geom_col(fill = "steelblue", width = 1) +
+  geom_text(
+    aes(label = sprintf("%.1f%%", pct)),
+    vjust = -0.3,
+    size = 1.8
+  ) +
+  facet_wrap(~ SMTSD) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 5, angle = 45, hjust = 1)) +
+  labs(
+    x = "PSI bin",
+    y = "Percentage of samples within tissue"
+  ) +
+  ylim(0, max(dist_exact_simplest_model_exon12$pct) * 1.1)
+```
+
+```{r}
+emm_resp_exon12_intron11_mainmodel <- summary(emm_tmb_exon12_intron11_mainmodel, type = "response")
+emm_response_exon12_intron11_mainmodel_df <- as.data.frame(emm_resp_exon12_intron11_mainmodel)
+ggplot(emm_response_exon12_intron11_mainmodel_df, aes(x = reorder(SMTSD, prob), y = prob)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.2) +
+  coord_flip() +
+  labs(
+    x = "Tissue",
+    y = "Predicted exon skipping proportion",
+    title = "MLH1 exon skipping across tissues"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+mainmodel_exon12_average <- glmmTMB(
+  cbind(skipping, average_inclusion) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    RIN_number + 
+    (1 | SUBJID),
+  
+  family = betabinomial(),
+  data = merged_onerow_per_sample_exon12
+)
+emm_exon12_average <- emmeans(mainmodel_exon12_average, ~ SMTSD)
+levels(mainmodel_exon12_average$data$SMTSD)
+contr_exon12_average <- contrast(emm_exon12_average, method = "trt.vs.ctrl", ref = "Breast - Mammary Tissue", reverse = TRUE)
+summary(contr_exon12_average, adjust = "BH")
+```
+
+
+
+
+
+
+
+
+
+```{r}
+# some extra quality control
+```
+
+```{r}
+# 1. Batch effect
+```
+
+```{r}
+# base model + nucleic acid isolation batch
+model_tmb_exon12_base_recount3_batch1 <- glmmTMB(
+  cbind(skipping, total_inclusion) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    (1 | SUBJID) + 
+    (1 | Nucleic_acid_isolation_batch),
+  
+  family = betabinomial(),
+  data = merged_onerow_per_sample_exon12
+)
+
+emm_tmb_exon12_base_recount3_batch1 <- emmeans(model_tmb_exon12_base_recount3_batch1, ~ SMTSD)
+pairs_tmb_exon12_base_recount3_batch1 <- pairs(emm_tmb_exon12_base_recount3_batch1, adjust = "BH")
+model_tmb_exon12_base_recount3_batch1
+pairs_tmb_exon12_base_recount3_batch1
+```
+
+```{r}
+emm_thisplot_exon12_base_recount3_batch1 <- emmeans(model_tmb_exon12_base_recount3_batch1, ~ SMTSD, type = "response")
+emm_thisplot_exon12_base_df_recount3_batch1 <- as.data.frame(emm_thisplot_exon12_base_recount3_batch1)
+breast_prob_exon12_base_recount3_batch1 <- emm_thisplot_exon12_base_df_recount3_batch1$prob[emm_thisplot_exon12_base_df_recount3_batch1$SMTSD == "Breast - Mammary Tissue"]
+
+emm_thisplot_exon12_base_df_recount3_batch1 <- emm_thisplot_exon12_base_df_recount3_batch1 %>%
+  mutate(
+    fold_vs_breast = breast_prob_exon12_base_recount3_batch1 / prob
+  )
+```
+
+```{r}
+# Compare with base model
+emm_thisplot_exon12_base_df_recount3
+emm_thisplot_exon12_base_df_recount3_batch1
+```
+
+
+```{r}
+# base model + expression batch
+model_tmb_exon12_base_recount3_batch2 <- glmmTMB(
+  cbind(skipping, total_inclusion) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    (1 | SUBJID) + 
+    (1 | Genotype_or_expression_batch),
+  
+  family = betabinomial(),
+  data = merged_onerow_per_sample_exon12
+)
+
+emm_tmb_exon12_base_recount3_batch2 <- emmeans(model_tmb_exon12_base_recount3_batch2, ~ SMTSD)
+pairs_tmb_exon12_base_recount3_batch2 <- pairs(emm_tmb_exon12_base_recount3_batch2, adjust = "BH")
+model_tmb_exon12_base_recount3_batch2
+pairs_tmb_exon12_base_recount3_batch2
+```
+
+```{r}
+emm_thisplot_exon12_base_recount3_batch2 <- emmeans(model_tmb_exon12_base_recount3_batch2, ~ SMTSD, type = "response")
+emm_thisplot_exon12_base_df_recount3_batch2 <- as.data.frame(emm_thisplot_exon12_base_recount3_batch2)
+breast_prob_exon12_base_recount3_batch2 <- emm_thisplot_exon12_base_df_recount3_batch2$prob[emm_thisplot_exon12_base_df_recount3_batch2$SMTSD == "Breast - Mammary Tissue"]
+
+emm_thisplot_exon12_base_df_recount3_batch2 <- emm_thisplot_exon12_base_df_recount3_batch2 %>%
+  mutate(
+    fold_vs_breast = breast_prob_exon12_base_recount3_batch2 / prob
+  )
+```
+
+```{r}
+# Compare with base model
+emm_thisplot_exon12_base_df_recount3
+emm_thisplot_exon12_base_df_recount3_batch2
+```
+
+
+```{r}
+summary(model_tmb_exon12_base_recount3)
+summary(model_tmb_exon12_base_recount3_batch1)
+summary(model_tmb_exon12_base_recount3_batch2)
+```
+```{r}
+# 2. RIN number
+```
+
+```{r}
+model_expression <- glmmTMB(
+  cbind(skipping, total_inclusion) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    mlh1_cpm +
+    RIN_number +
+    (1 | SUBJID),
+  
+  family = betabinomial(),
+  data = merged_onerow_per_sample_exon12
+)
+
+emm_tmb_model_expression <- emmeans(model_expression, ~ SMTSD)
+pairs_tmb_model_expression <- pairs(emm_tmb_model_expression, adjust = "BH")
+model_expression
+pairs_tmb_model_expression
+```
+```{r}
+summary(model_expression)
+```
+```{r}
+mainmodel_exon12_11_12 <- glmmTMB(
+  cbind(skipping, inc_11_12) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    RIN_number +
+    (1 | SUBJID),
+  family = betabinomial(),
+  data = merged_onerow_per_sample_exon12
+)
+
+emm_tmb_mainmodel_exon12_11_12 <- emmeans(mainmodel_exon12_11_12, ~ SMTSD)
+pairs_tmb_mainmodel_exon12_11_12 <- pairs(emm_tmb_mainmodel_exon12_11_12, adjust = "BH")
+mainmodel_exon12_11_12
+pairs_tmb_mainmodel_exon12_11_12
+```
+```{r}
+emm_response_11_12 <- emmeans(mainmodel_exon12_11_12, ~ SMTSD, type="response")
+
+emm_response_11_12
+```
+
+
+```{r}
+# simplest model + RIN number -> now main model
+mainmodel_exon12 <- glmmTMB(
+  cbind(skipping, total_inclusion) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    RIN_number +
+    (1 | SUBJID),
+  
+  family = betabinomial(),
+  data = merged_onerow_per_sample_exon12
+)
+
+emm_tmb_mainmodel_exon12 <- emmeans(mainmodel_exon12, ~ SMTSD)
+pairs_tmb_mainmodel_exon12 <- pairs(emm_tmb_mainmodel_exon12, adjust = "BH")
+mainmodel_exon12
+pairs_tmb_mainmodel_exon12
+```
+```{r}
+emm_exon12 <- emmeans(mainmodel_exon12, ~ SMTSD)
+levels(mainmodel_exon12$data$SMTSD)
+contr_exon12 <- contrast(emm_exon12, method = "trt.vs.ctrl", ref = "Breast - Mammary Tissue", reverse = TRUE)
+summary(contr_exon12, adjust = "BH")
+```
+```{r}
+emm_response1 <- emmeans(mainmodel_exon12, ~ SMTSD, type="response")
+
+emm_response1
+```
+```{r}
+emm_default <- emmeans(mainmodel_exon12, ~ SMTSD, type = "response")
+
+breast_contrasts_response <- contrast(
+  emm_default,
+  method = "trt.vs.ctrl",
+  ref = "Breast - Mammary Tissue",
+  reverse = TRUE
+)
+
+summary(breast_contrasts_response, adjust = "BH")
+```
+
+
+```{r}
+emm_default <- emmeans(mainmodel_exon12, ~ SMTSD, type = "response")
+emm_default          # gives you the probabilities + CIs, DEFAULT method
+pairs(emm_default)
+```
+
+
+```{r}
+emm_link <- emmeans(mainmodel_exon12, ~ SMTSD)              
+emm_response <- regrid(emm_link, transform = "response")  
+emm_response         
+pairs(emm_response)
+```
+
+
+```{r}
+summary(emm_exon12, type = "response")
+```
+
+
+```{r}
+emm_thisplot_mainmodel_exon12 <- emmeans(mainmodel_exon12, ~ SMTSD, type = "response")
+emm_thisplot_mainmodel_exon12_df <- as.data.frame(emm_thisplot_mainmodel_exon12)
+breast_prob_mainmodel_exon12 <- emm_thisplot_mainmodel_exon12_df$prob[emm_thisplot_mainmodel_exon12_df$SMTSD == "Breast - Mammary Tissue"]
+
+emm_thisplot_mainmodel_exon12_df <- emm_thisplot_mainmodel_exon12_df %>%
+  mutate(
+    fold_vs_breast = breast_prob_mainmodel_exon12 / prob
+  )
+```
+
+```{r}
+emm_thisplot_simplest_model_exon12_df
+emm_thisplot_mainmodel_exon12_df
+```
+
+```{r}
+summary(mainmodel_exon12)
+summary(simplest_model_exon12)
+```
+
+```{r}
+pairs_tmb_mainmodel_exon12_df <- as.data.frame(pairs_tmb_mainmodel_exon12)
+
+# Filter Breast comparisons
+pairs_tmb_mainmodel_exon12_df <- pairs_tmb_mainmodel_exon12_df %>%
+  filter(grepl("Breast - Mammary Tissue", contrast))
+
+# Compute effects + significance + modified labels
+pairs_tmb_mainmodel_exon12_df <- pairs_tmb_mainmodel_exon12_df %>%
+  mutate(
+    odds_ratio = exp(estimate),
+    percent_difference = (odds_ratio - 1) * 100,
+    lower_ci = (exp(estimate - 1.96 * SE) - 1) * 100,
+    upper_ci = (exp(estimate + 1.96 * SE) - 1) * 100,
+
+    sig = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE ~ ""
+    ),
+
+    # clean tissue label + add stars
+    tissue = gsub(".*Breast - Mammary Tissue - ", "", contrast),
+    tissue = paste0(tissue, sig)
+  )
+
+# Plot with stars in labels
+ggplot(pairs_tmb_mainmodel_exon12_df,
+       aes(x = percent_difference, y = reorder(tissue, percent_difference))) +
+  geom_point(size = 3) +
+  geom_errorbarh(
+    aes(xmin = lower_ci, xmax = upper_ci),
+    height = 0.2
+  ) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  theme_minimal() +
+  labs(
+    x = "Percent difference in exon skipping odds vs Breast",
+    y = "Tissue"
+  )
+```
+
+```{r}
+pairs_df <- as.data.frame(summary(contr_exon12, adjust = "BH"))
+
+pairs_df <- pairs_df %>%
+  mutate(
+    odds_ratio = exp(estimate),
+    percent_difference = (odds_ratio - 1) * 100,
+
+    lower_ci = (exp(estimate - 1.96 * SE) - 1) * 100,
+    upper_ci = (exp(estimate + 1.96 * SE) - 1) * 100,
+
+    sig = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE ~ ""
+    ),
+
+    # extract tissue name (Breast is already reference direction)
+    tissue = gsub("Breast - Mammary Tissue - ", "", contrast),
+    tissue = paste0(tissue, sig)
+  )
+pairs_df <- pairs_df %>%
+  mutate(
+    tissue = contrast,
+
+    # remove only "(" and ")" but keep text
+    tissue = gsub("[()]", "", tissue),
+
+    tissue = trimws(tissue)
+  )
+pairs_df <- pairs_df %>%
+  mutate(
+    tissue = gsub("Colon - Sigmoid", "Colon (Sig)", tissue),
+    tissue = gsub("Colon - Transverse", "Colon (Trans)", tissue),
+    tissue = gsub("Small Intestine - Terminal Ileum", "SI (Ileum)", tissue),
+
+    # optional simplifications
+    tissue = gsub("Whole Blood", "Blood", tissue),
+    tissue = gsub("Breast - Mammary Tissue", "Breast", tissue)
+  )
+pairs_df <- pairs_df %>%
+  mutate(
+    tissue = paste0(tissue, sig)
+  )
+    
+ggplot(pairs_df,
+       aes(x = percent_difference,
+           y = reorder(tissue, percent_difference))) +
+  geom_point(size = 3) +
+  geom_errorbarh(
+    aes(xmin = lower_ci, xmax = upper_ci),
+    height = 0.2
+  ) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 12),  # tissue labels
+    axis.text.x = element_text(size = 12)   # x-axis labels (optional)
+  ) +
+  labs(
+    x = "Percent difference in exon skipping odds vs Breast",
+    y = "Tissue"
+  )
+```
+
+```{r}
+pairs_df <- as.data.frame(summary(contr_exon12, adjust = "BH"))
+
+pairs_df <- pairs_df %>%
+  mutate(
+    odds_ratio = exp(estimate),
+    percent_difference = odds_ratio,
+
+    lower_ci = exp(estimate - 1.96 * SE),
+    upper_ci = exp(estimate + 1.96 * SE),
+
+    sig = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE ~ ""
+    ),
+
+    # extract tissue name (Breast is already reference direction)
+    tissue = gsub("Breast - Mammary Tissue - ", "", contrast),
+    tissue = paste0(tissue, sig)
+  )
+pairs_df <- pairs_df %>%
+  mutate(
+    tissue = contrast,
+
+    # remove only "(" and ")" but keep text
+    tissue = gsub("[()]", "", tissue),
+
+    tissue = trimws(tissue)
+  )
+pairs_df <- pairs_df %>%
+  mutate(
+    tissue = gsub("Colon - Sigmoid", "Colon (Sigmoid)", tissue),
+    tissue = gsub("Colon - Transverse", "Colon (Transverse)", tissue),
+    tissue = gsub("Small Intestine - Terminal Ileum", "Small intestine", tissue),
+
+    # optional simplifications
+    tissue = gsub("Whole Blood", "Blood", tissue),
+    tissue = gsub("Breast - Mammary Tissue", "Breast", tissue)
+  )
+pairs_df <- pairs_df %>%
+  mutate(
+    tissue = paste0(tissue, sig)
+  )
+    
+ggplot(pairs_df,
+       aes(x = odds_ratio,
+           y = reorder(tissue, odds_ratio))) +
+  geom_point(size = 3) +
+  geom_errorbarh(
+    aes(xmin = lower_ci, xmax = upper_ci),
+    height = 0.2
+  ) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  scale_x_continuous(
+    breaks = c(1, 3, 5, 7, 9, 11, 13)
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 11),  # tissue labels
+    axis.text.x = element_text(size = 11)   # x-axis labels (optional)
+  ) +
+  labs(
+    x = "Odds ratio (Breast relative to tissue)",
+    y = "Tissue comparison"
+  )
+```
+
+
+```{r}
+# this plot needs to be made with inc_11_12, not total_inclusion for a better psi
+emm_resp_mainmodel_exon12 <- summary(emm_tmb_mainmodel_exon12, type = "response")
+emm_resp_mainmodel_exon12_df <- as.data.frame(emm_resp_mainmodel_exon12)
+emm_resp_mainmodel_exon12_df <- emm_resp_mainmodel_exon12_df %>%
+  mutate(
+    SMTSD = gsub("Small Intestine - Terminal Ileum", "Small Intestine", SMTSD),
+    SMTSD = gsub("Colon - Sigmoid", "Colon (Sigmoid)", SMTSD),
+    SMTSD = gsub("Colon - Transverse", "Colon (Transverse)", SMTSD),
+    SMTSD = gsub("Whole Blood", "Blood", SMTSD),
+    SMTSD = gsub("Breast - Mammary Tissue", "Breast", SMTSD)
+  )
+ggplot(emm_resp_mainmodel_exon12_df, aes(x = reorder(SMTSD, prob), y = prob)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.2) +
+  coord_flip() +
+  labs(
+    x = "Tissue",
+    y = "Predicted exon 12 skipping probability"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 11),  # tissue labels
+    axis.text.x = element_text(size = 11))
+```
+
+```{r}
+emm_resp_mainmodel_exon12 <- summary(emm_tmb_mainmodel_exon12, type = "response")
+
+emm_resp_mainmodel_exon12_df <- as.data.frame(emm_resp_mainmodel_exon12)
+
+emm_resp_mainmodel_exon12_df <- emm_resp_mainmodel_exon12_df %>%
+  mutate(
+    # rename tissues
+    SMTSD = gsub("Small Intestine - Terminal Ileum", "Small Intestine", SMTSD),
+    SMTSD = gsub("Colon - Sigmoid", "Colon (Sigmoid)", SMTSD),
+    SMTSD = gsub("Colon - Transverse", "Colon (Transverse)", SMTSD),
+    SMTSD = gsub("Whole Blood", "Blood", SMTSD),
+    SMTSD = gsub("Breast - Mammary Tissue", "Breast", SMTSD),
+
+    # add percentage columns
+    prob_percent = prob * 100,
+    LCL_percent  = asymp.LCL * 100,
+    UCL_percent  = asymp.UCL * 100
+  )
+```
+```{r}
+ggplot(emm_resp_mainmodel_exon12_df,
+       aes(x = reorder(SMTSD, prob),
+           y = prob_percent)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = LCL_percent, ymax = UCL_percent), width = 0.2) +
+  coord_flip() +
+  labs(
+    x = "Tissue",
+    y = "Predicted exon 12 skipping probability (%)"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 11),
+    axis.text.x = element_text(size = 11)
+  )
+```
+
+
+
+```{r}
+# 3. base model + death classification
+```
+
+```{r}
+# base model + classification of death
+model_tmb_exon12_base_recount3_class <- glmmTMB(
+  cbind(skipping, total_inclusion) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    Classification_death +
+    (1 | SUBJID),
+  
+  family = betabinomial(),
+  data = merged_onerow_per_sample_exon12
+)
+
+emm_tmb_exon12_base_recount3_class <- emmeans(model_tmb_exon12_base_recount3_class, ~ SMTSD)
+pairs_tmb_exon12_base_recount3_class <- pairs(emm_tmb_exon12_base_recount3_class, adjust = "BH")
+model_tmb_exon12_base_recount3_class
+pairs_tmb_exon12_base_recount3_class
+```
+
+```{r}
+emm_thisplot_exon12_base_recount3_class <- emmeans(model_tmb_exon12_base_recount3_class, ~ SMTSD, type = "response")
+emm_thisplot_exon12_base_df_recount3_class <- as.data.frame(emm_thisplot_exon12_base_recount3_class)
+breast_prob_exon12_base_recount3_class <- emm_thisplot_exon12_base_df_recount3_class$prob[emm_thisplot_exon12_base_df_recount3_class$SMTSD == "Breast - Mammary Tissue"]
+
+emm_thisplot_exon12_base_df_recount3_class <- emm_thisplot_exon12_base_df_recount3_class %>%
+  mutate(
+    fold_vs_breast = breast_prob_exon12_base_recount3_class / prob
+  )
+```
+
+```{r}
+emm_thisplot_exon12_base_df_recount3
+emm_thisplot_exon12_base_df_recount3_class
+```
+
+```{r}
+summary(model_tmb_exon12_base_recount3)
+summary(model_tmb_exon12_base_recount3_class)
+```
+
+
+```{r}
+# 4. base model with techincal and expression covariats
+```
+
+```{r}
+# unfiltered model with the technical and expression covariats
+model_tmb_exon12_covariats_recount3 <- glmmTMB(
+  cbind(skipping, total_inclusion) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    scale(bc_auc.all_reads_annotated_bases) +
+    scale(`star.uniquely_mapped_reads_%_both`) +
+    scale(junction_avg_coverage) +
+    scale(mlh1_cpm) +
+    (1 | SUBJID),
+  
+  family = betabinomial(),
+  data = merged_onerow_per_sample_exon12
+)
+
+emm_tmb_exon12_covariats_recount3 <- emmeans(model_tmb_exon12_covariats_recount3, ~ SMTSD)
+pairs_tmb_exon12_covariats_recount3 <- pairs(emm_tmb_exon12_covariats_recount3, adjust = "BH")
+model_tmb_exon12_covariats_recount3
+pairs_tmb_exon12_covariats_recount3
+```
+
+```{r}
+emm_thisplot_exon12_covariats_recount3 <- emmeans(model_tmb_exon12_covariats_recount3, ~ SMTSD, type = "response")
+emm_thisplot_exon12_covariats_df_recount3 <- as.data.frame(emm_thisplot_exon12_covariats_recount3)
+breast_prob_exon12_covariats_recount3 <- emm_thisplot_exon12_covariats_df_recount3$prob[emm_thisplot_exon12_covariats_df_recount3$SMTSD == "Breast - Mammary Tissue"]
+
+emm_thisplot_exon12_covariats_df_recount3 <- emm_thisplot_exon12_covariats_df_recount3 %>%
+  mutate(
+    fold_vs_breast = breast_prob_exon12_covariats_recount3 / prob
+  )
+```
+
+```{r}
+emm_thisplot_exon12_base_df_recount3
+emm_thisplot_exon12_covariats_df_recount3
+```
+
+
+```{r}
+summary(model_tmb_exon12_base_recount3)
+summary(model_tmb_exon12_covariats_recount3)
+```
+```{r}
+# 5. check for outliers
+```
+
+```{r}
+library(DHARMa)
+
+sim_res_exon12 <- simulateResiduals(mainmodel_exon12)
+plot(sim_res_exon12)
+```
+```{r}
+testOutliers(sim_res_exon12, type = 'bootstrap')
+```
+```{r}
+plotResiduals(sim_res_exon12, merged_onerow_per_sample_exon12$SMTSD)
+plotResiduals(sim_res_exon12, merged_onerow_per_sample_exon12$RIN_number)
+```
+```{r}
+testDispersion(sim_res_exon12)
+```
+
+
+```{r}
+testZeroInflation(sim_res_exon12)
+```
+
+
+```{r}
+plot_data <- merged_onerow_per_sample_exon12 %>%
+  dplyr::select(SMTSD, inc_11_12, inc_12_13) %>%
+  pivot_longer(
+    cols = c(inc_11_12, inc_12_13),
+    names_to = "junction",
+    values_to = "reads"
+  )
+
+ggplot(plot_data,
+       aes(x = SMTSD, y = reads, fill = junction)) +
+  geom_boxplot(outlier.size = 0.3) +
+  theme_classic() +
+  labs(
+    x = "Tissue",
+    y = "Canonical junction read count",
+    fill = "Junction"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+
+```{r}
+tissue_order <- merged_onerow_per_sample_exon12 %>%
+  mutate(total_inclusion = inc_11_12 + inc_12_13) %>%
+  group_by(SMTSD) %>%
+  summarise(
+    median_total_inclusion = median(total_inclusion, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(median_total_inclusion)) %>%
+  pull(SMTSD)
+
+plot_data <- merged_onerow_per_sample_exon12 %>%
+  dplyr::select(SMTSD, inc_11_12, inc_12_13) %>%
+  pivot_longer(
+    cols = c(inc_11_12, inc_12_13),
+    names_to = "junction",
+    values_to = "reads"
+  ) %>%
+  mutate(
+    SMTSD = factor(SMTSD, levels = tissue_order)
+  )
+
+# Plot
+ggplot(plot_data,
+       aes(x = SMTSD, y = reads, fill = junction)) +
+  geom_boxplot(outlier.size = 0.3) +
+  theme_classic() +
+  labs(
+    x = "Tissue",
+    y = "Junction split-read count",
+    fill = "Junction"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+
+
+
+
