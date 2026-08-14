@@ -1,0 +1,1130 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(dplyr)
+
+df_exon6  <- merged_onerow_per_sample_exon6  %>% mutate(exon = "Exon6")
+df_exon9  <- merged_onerow_per_sample_exon9  %>% mutate(exon = "Exon9")
+df_exon10 <- merged_onerow_per_sample_exon10 %>% mutate(exon = "Exon10")
+df_exon12 <- merged_onerow_per_sample_exon12 %>% mutate(exon = "Exon12")
+df_exon15 <- merged_onerow_per_sample_exon15 %>% mutate(exon = "Exon15")
+df_exon16 <- merged_onerow_per_sample_exon16 %>% mutate(exon = "Exon16")
+df_exon17 <- merged_onerow_per_sample_exon17 %>% mutate(exon = "Exon17")
+```
+
+
+```{r}
+df_all_exons <- bind_rows(
+  df_exon6,
+  df_exon9,
+  df_exon10,
+  df_exon12,
+  df_exon15,
+  df_exon16,
+  df_exon17
+)
+```
+
+
+```{r}
+df_all_exons$exon <- factor(
+  df_all_exons$exon,
+  levels = c(
+    "Exon12",
+    "Exon6",
+    "Exon9",
+    "Exon10",
+    "Exon15",
+    "Exon16",
+    "Exon17"
+  )
+)
+```
+
+
+```{r}
+library(glmmTMB)
+
+model_joint_all_exons <- glmmTMB(
+  cbind(skipping, total_inclusion) ~
+    exon * SMTSD +
+    SEX +
+    AGE +
+    RIN_number +
+    (1 | SUBJID),
+  family = betabinomial(),
+  data = df_all_exons
+)
+```
+
+
+```{r}
+library(emmeans)
+library(dplyr)
+
+# 1. Fit emmeans model (ALL exons, ALL tissues)
+emm_all_exons <- emmeans(model_joint_all_exons, ~ exon | SMTSD)
+```
+
+```{r}
+summary(emm_all_exons, type = "response")
+```
+
+```{r}
+contr <- contrast(
+  emm_all_exons,
+  method = list(
+    Exon6_vs_Exon12  = c(-1, 1, 0, 0, 0, 0, 0),
+    Exon9_vs_Exon12  = c(-1, 0, 1, 0, 0, 0, 0),
+    Exon10_vs_Exon12 = c(-1, 0, 0, 1, 0, 0, 0),
+    Exon15_vs_Exon12 = c(-1, 0, 0, 0, 1, 0, 0),
+    Exon16_vs_Exon12 = c(-1, 0, 0, 0, 0, 1, 0),
+    Exon17_vs_Exon12 = c(-1, 0, 0, 0, 0, 0, 1)
+  ),
+  by = "SMTSD"
+)
+```
+
+```{r}
+contr_sum <- as.data.frame(summary(contr, infer = TRUE)) %>%
+  filter(SMTSD == "Breast - Mammary Tissue")
+```
+
+```{r}
+final_table <- contr_sum %>%
+  mutate(
+    OR = exp(estimate),
+    OR_low = exp(asymp.LCL),
+    OR_high = exp(asymp.UCL)
+  )
+```
+
+```{r}
+emm_resp <- emmeans(model_joint_all_exons, ~ exon | SMTSD, type = "response")
+
+breast_probs <- as.data.frame(emm_resp) %>%
+  filter(SMTSD == "Breast - Mammary Tissue") %>%
+  mutate(exon = tolower(exon)) %>%
+  dplyr::select(exon, prob)
+```
+
+```{r}
+final_table <- final_table %>%
+  mutate(
+    exon = sub("_vs_Exon12", "", contrast),
+    exon = tolower(exon)
+  )
+```
+
+```{r}
+final_table <- final_table %>%
+  left_join(breast_probs, by = "exon")
+```
+
+```{r}
+exon12_prob <- breast_probs %>%
+  filter(exon == "exon12") %>%
+  pull(prob)
+```
+
+```{r}
+final_table <- final_table %>%
+  mutate(
+    fold_vs_exon12 = prob / exon12_prob
+  )
+```
+
+```{r}
+final_table <- final_table %>%
+  dplyr::select(
+    contrast,
+    estimate,
+    SE,
+    p.value,
+    OR,
+    OR_low,
+    OR_high,
+    prob,
+    fold_vs_exon12
+  ) %>%
+  arrange(p.value)
+
+```
+```{r}
+final_table <- contr_sum %>%
+  mutate(
+    OR = exp(-estimate),
+    OR_low = exp(-asymp.UCL),
+    OR_high = exp(-asymp.LCL)
+  )
+```
+
+```{r}
+final_table
+```
+
+
+```{r}
+plot_df <- final_table %>%
+  mutate(
+    exon = gsub("_vs_Exon12", "", contrast),
+    label = paste0("Exon12 - ", exon),
+
+    sig = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE ~ ""
+    ),
+
+    label = paste0(label, " ", sig)
+  )
+
+ggplot(plot_df,
+       aes(x = OR,
+           y = reorder(label, OR))) +
+  geom_point(size = 3) +
+  geom_errorbarh(
+    aes(xmin = OR_low, xmax = OR_high),
+    height = 0.2
+  ) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  theme_minimal() +
+  labs(
+    x = "Odds ratio (Exon12 relative to Exon, in Breast tissue)",
+    y = "Exon comparison"
+  ) + 
+  theme(
+    axis.text.y = element_text(size = 11),  # tissue labels
+    axis.text.x = element_text(size = 11))
+```
+
+
+```{r}
+ggplot(plot_df,
+       aes(x = OR,
+           y = reorder(label, OR))) +
+  geom_point(size = 3) +
+  geom_errorbarh(
+    aes(xmin = OR_low, xmax = OR_high),
+    height = 0.2
+  ) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+
+  scale_x_continuous(
+    breaks = c(0.2, 0.4, 0.6, 0.8, 1, 1.2)
+  ) +
+
+  theme_minimal() +
+  labs(
+    x = "Odds ratio (Exon12 relative to Exon, in Breast tissue)",
+    y = "Exon comparison"
+  ) + 
+  theme(
+    axis.text.y = element_text(size = 11),
+    axis.text.x = element_text(size = 11)
+  )
+```
+
+
+```{r}
+emm_resp_plot <- emmeans(
+  model_joint_all_exons,
+  ~ exon | SMTSD,
+  type = "response"
+)
+
+breast_probs_plot <- as.data.frame(emm_resp_plot) %>%
+  filter(SMTSD == "Breast - Mammary Tissue")
+```
+```{r}
+exon12_prob <- breast_probs_plot %>%
+  filter(exon == "Exon12") %>%
+  pull(prob)
+```
+```{r}
+plot_df <- breast_probs_plot %>%
+  filter(exon != "Exon12") %>%
+  mutate(
+    percent_change = ((prob / exon12_prob) - 1) * 100,
+    lower = ((asymp.LCL / exon12_prob) - 1) * 100,
+    upper = ((asymp.UCL / exon12_prob) - 1) * 100
+  )
+```
+```{r}
+plot_df <- plot_df %>%
+  left_join(
+    final_table %>%
+      dplyr::select(p.value, prob_exon = prob),
+    by = c("prob" = "prob_exon")
+  )
+```
+```{r}
+plot_df <- plot_df %>%
+  mutate(
+    sig = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE ~ ""
+    ),
+
+    exon_label = paste0(exon, " ", sig)
+  )
+```
+```{r}
+ggplot(plot_df,
+       aes(x = percent_change,
+           y = reorder(exon_label, percent_change))) +
+  geom_point(size = 3) +
+  geom_errorbarh(
+    aes(xmin = lower, xmax = upper),
+    height = 0.2
+  ) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 11),  # tissue labels
+    axis.text.x = element_text(size = 11)   # x-axis labels (optional)
+  ) + 
+  labs(
+    x = "Percent change in exon skipping probability vs Exon12 (Breast)",
+    y = "Exon skipping event"
+  )
+```
+
+
+```{r}
+library(tibble)
+
+effect_matrix <- tribble(
+  ~Contrast, ~Exon6, ~Exon9, ~Exon10, ~Exon12, ~Exon15, ~Exon16, ~Exon17,
+
+  "Breast vs colon sigmoid",      -12,   55,   19,  131,   15,   38,   26,
+  "Breast vs colon transverse",    19,   124,   32,  165,   35,    3,  -45,
+  "Breast vs liver",               17,   309,  303,  540,   67,  -27,  -47,
+  "Breast vs ovary",              -46,    24,  -57,   91,  -65,   66,   48,
+  "Breast vs pancreas",            39,   763,  223,  497,  200,    8,  -59,
+  "Breast vs prostate",           -19,   313,  -29,  187,  -24,   69,  -37,
+  "Breast vs small intestine",    -18,    43,    7,   79,   -7,   -4,  -71,
+  "Breast vs stomach",              0,   160,   37,  129,   70,   31,  -45,
+  "Breast vs uterus",             -19,    15,  -52,  203,  -59,   18,   10,
+  "Breast vs whole blood",        -43,   -21,   33,  189,  -77,  -21,  -88
+)
+```
+
+```{r}
+mat <- as.data.frame(effect_matrix)
+rownames(mat) <- mat$Contrast
+mat <- mat[, -1]   # remove contrast column
+
+mat <- as.matrix(mat)
+```
+
+```{r}
+dist_mat <- dist(t(mat))
+hc <- hclust(dist_mat)
+plot(hc)
+```
+
+```{r}
+mat_long$Exon <- factor(mat_long$Exon,
+                        levels = c("Exon6","Exon9","Exon10","Exon12",
+                                   "Exon15","Exon16","Exon17"))
+```
+
+
+```{r}
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
+# convert to long format
+mat_long <- mat %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("Contrast") %>%
+  pivot_longer(
+    cols = -Contrast,
+    names_to = "Exon",
+    values_to = "Effect"
+  )
+
+# set desired exon order
+mat_long$Exon <- factor(
+  mat_long$Exon,
+  levels = c("Exon6", "Exon9", "Exon10", "Exon12",
+             "Exon15", "Exon16", "Exon17")
+)
+
+# heatmap
+ggplot(mat_long, aes(x = Exon, y = Contrast, fill = Effect)) +
+  geom_tile() +
+  scale_fill_gradient2(
+    low = "blue",
+    mid = "white",
+    high = "red",
+    midpoint = 0
+  ) +
+  theme_minimal() +
+  labs(
+    x = "Exon",
+    y = "Tissue contrast (vs breast)",
+    fill = "Percent difference"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+
+
+```{r}
+ggplot(mat_long, aes(x = Exon, y = reorder(Contrast, Effect), fill = Effect)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red") +
+  theme_minimal() +
+  labs(x = "Exon", y = "Tissue contrast (vs breast)", fill = "% difference")
+```
+```{r}
+library(tibble)
+
+effect_matrix <- tribble(
+  ~Contrast, ~Exon6, ~Exon9, ~Exon10, ~Exon12, ~Exon15, ~Exon16, ~Exon17,
+
+  "Breast vs colon sigmoid",      0.8793821,  1.5472089, 1.1853599, 2.308121, 1.1538978, 1.3845075, 1.2587843,
+  "Breast vs colon transverse",   1.1876998,  2.2436467, 1.3229202, 2.652919, 1.3533285, 1.0298971, 0.5499579,
+  "Breast vs liver",              1.1737585,  4.0913061, 4.0293592, 6.402052, 1.6690251, 0.7311491, 0.5304063,
+  "Breast vs ovary",              0.5441507,  1.2425832, 0.4308002, 1.908189, 0.3451256, 1.6618149, 1.4839214,
+  "Breast vs pancreas",           1.3864744,  8.6317882, 3.2296160, 5.969329, 3.0041197, 1.0751493, 0.4147279,
+  "Breast vs prostate",           0.8096894,  4.1252024, 0.7139541, 2.867850, 0.7638610, 1.6882510, 0.6336554,
+  "Breast vs small intestine",    0.8229777,  1.4294264, 1.0699204, 1.786654, 0.9345624, 0.9587448, 0.2948776,
+  "Breast vs stomach",            1.0029248,  2.5956262, 1.3677985, 2.285755, 1.7010997, 1.3062013, 0.5487219,
+  "Breast vs uterus",             0.8127089,  1.1557976, 0.4828948, 3.032192, 0.4105127, 1.1814484, 1.1020842,
+  "Breast vs whole blood",        0.5747104,  0.7936194, 1.3326247, 2.893705, 0.2312378, 0.7858893, 0.1199963
+)
+```
+
+```{r}
+mat <- as.data.frame(effect_matrix)
+rownames(mat) <- mat$Contrast
+mat <- mat[, -1]   # remove contrast column
+
+mat <- as.matrix(mat)
+```
+
+```{r}
+dist_mat <- dist(t(mat))
+hc <- hclust(dist_mat)
+plot(hc)
+```
+
+```{r}
+# convert to long format
+mat_long <- mat %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("Contrast") %>%
+  pivot_longer(
+    cols = -Contrast,
+    names_to = "Exon",
+    values_to = "Effect"
+  )
+
+# set desired exon order
+mat_long$Exon <- factor(
+  mat_long$Exon,
+  levels = c("Exon6", "Exon9", "Exon10", "Exon12",
+             "Exon15", "Exon16", "Exon17")
+)
+```
+```{r}
+mat_long$Exon <- factor(mat_long$Exon,
+                        levels = c("Exon6","Exon9","Exon10","Exon12",
+                                   "Exon15","Exon16","Exon17"))
+```
+
+```{r}
+mat_long <- mat_long %>%
+  mutate(
+    Contrast = gsub("Breast vs ", "Breast - ", Contrast),
+    Contrast = gsub("small intestine", "Small Intestine", Contrast),
+    Contrast = gsub("colon sigmoid", "Colon (Sigmoid)", Contrast),
+    Contrast = gsub("colon transverse", "Colon (Transverse)", Contrast),
+    Contrast = gsub("whole blood", "Blood", Contrast),
+    Contrast = gsub("uterus", "Uterus", Contrast),
+    Contrast = gsub("prostate", "Prostate", Contrast),
+    Contrast = gsub("ovary", "Ovary", Contrast),
+    Contrast = gsub("pancreas", "Pancreas", Contrast),
+    Contrast = gsub("liver", "Liver", Contrast),
+    Contrast = gsub("stomach", "Stomach", Contrast),
+  )
+```
+
+
+```{r}
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
+ggplot(mat_long, aes(x = Exon, y = Contrast)) +
+  geom_tile(aes(fill = Effect)) +
+  scale_fill_gradient2(
+  low = "#2166ac",
+  mid = "white",
+  high = "#d7191c",
+  midpoint = 0,
+  trans = "log2",
+  breaks = c(0.25, 1, 4),
+  labels = c("0.25", "1", "4")
+  ) +
+  theme_minimal() +
+  labs(
+    x = "Exon",
+    y = "Tissue contrast",
+    fill = "Odds ratio\n(Breast relative to tissue)"
+  ) +
+  theme(
+    axis.text.x = element_text(size = 11, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 11)
+  )
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+breast <- merged_onerow_per_sample_exon12 %>% filter(SMTSD == "Breast - Mammary Tissue")
+```
+```{r}
+breast_male <- breast %>% filter(SEX == 1) # 297 samples
+breast_female <- breast %>% filter(SEX == 2) # 174 samples
+```
+```{r}
+breast_male$PSI <- breast_male$skipping / 
+                   (breast_male$total_inclusion + breast_male$skipping)
+
+average_PSI <- mean(breast_male$PSI, na.rm = TRUE)
+
+average_PSI #0.007039003
+```
+```{r}
+breast_female$PSI <- breast_female$skipping / 
+                   (breast_female$total_inclusion + breast_female$skipping)
+
+average_PSI_female <- mean(breast_female$PSI, na.rm = TRUE)
+average_PSI_female #0.006233057
+```
+```{r}
+merged_onerow_per_sample_exon12_withoutmale <- merged_onerow_per_sample_exon12 %>%
+  filter(!(SEX == 1 & SMTSD == "Breast - Mammary Tissue"))
+merged_onerow_per_sample_exon12_withoutfemale <- merged_onerow_per_sample_exon12 %>%
+  filter(!(SEX == 2 & SMTSD == "Breast - Mammary Tissue"))
+```
+
+```{r}
+mainmodel_exon12_withoutfemale <- glmmTMB(
+  cbind(skipping, total_inclusion) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    RIN_number +
+    (1 | SUBJID),
+  
+  family = betabinomial(),
+  data = merged_onerow_per_sample_exon12_withoutfemale
+)
+
+emm_tmb_mainmodel_exon12_withoutfemale <- emmeans(mainmodel_exon12_withoutfemale, ~ SMTSD)
+pairs_tmb_mainmodel_exon12_withoutfemale <- pairs(emm_tmb_mainmodel_exon12_withoutfemale, adjust = "BH")
+mainmodel_exon12_withoutfemale
+pairs_tmb_mainmodel_exon12_withoutfemale
+```
+```{r}
+emm_exon12_withoutfemale <- emmeans(mainmodel_exon12_withoutfemale, ~ SMTSD)
+levels(mainmodel_exon12_withoutfemale$data$SMTSD)
+contr_exon12_withoutfemale <- contrast(emm_exon12_withoutfemale, method = "trt.vs.ctrl", ref = "Breast - Mammary Tissue", reverse = TRUE)
+summary(contr_exon12_withoutfemale, adjust = "BH")
+```
+```{r}
+summary(emm_exon12_withoutfemale, type = "response")
+```
+```{r}
+pairs_df_withoutfemale <- as.data.frame(summary(contr_exon12_withoutfemale, adjust = "BH"))
+
+pairs_df_withoutfemale <- pairs_df_withoutfemale %>%
+  mutate(
+    odds_ratio = exp(estimate),
+    percent_difference = odds_ratio,
+
+    lower_ci = exp(estimate - 1.96 * SE),
+    upper_ci = exp(estimate + 1.96 * SE),
+
+    sig = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE ~ ""
+    ),
+
+    # extract tissue name (Breast is already reference direction)
+    tissue = gsub("Breast - Mammary Tissue - ", "", contrast),
+    tissue = paste0(tissue, sig)
+  )
+pairs_df_withoutfemale <- pairs_df_withoutfemale %>%
+  mutate(
+    tissue = contrast,
+
+    # remove only "(" and ")" but keep text
+    tissue = gsub("[()]", "", tissue),
+
+    tissue = trimws(tissue)
+  )
+pairs_df_withoutfemale <- pairs_df_withoutfemale %>%
+  mutate(
+    tissue = gsub("Colon - Sigmoid", "Colon (Sigmoid)", tissue),
+    tissue = gsub("Colon - Transverse", "Colon (Transverse)", tissue),
+    tissue = gsub("Small Intestine - Terminal Ileum", "Small intestine", tissue),
+
+    # optional simplifications
+    tissue = gsub("Whole Blood", "Blood", tissue),
+    tissue = gsub("Breast - Mammary Tissue", "Breast", tissue)
+  )
+pairs_df_withoutfemale <- pairs_df_withoutfemale %>%
+  mutate(
+    tissue = paste0(tissue, sig)
+  )
+    
+ggplot(pairs_df_withoutfemale,
+       aes(x = odds_ratio,
+           y = reorder(tissue, odds_ratio))) +
+  geom_point(size = 3) +
+  geom_errorbarh(
+    aes(xmin = lower_ci, xmax = upper_ci),
+    height = 0.2
+  ) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  scale_x_continuous(
+    breaks = c(1, 3, 5, 7, 9, 11, 13)
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 11),  # tissue labels
+    axis.text.x = element_text(size = 11)   # x-axis labels (optional)
+  ) +
+  labs(
+    x = "Odds ratio (Breast relative to tissue, without female breast samples)",
+    y = "Tissue comparison"
+  )
+```
+
+```{r}
+mainmodel_exon12_withoutmale <- glmmTMB(
+  cbind(skipping, total_inclusion) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    RIN_number +
+    (1 | SUBJID),
+  
+  family = betabinomial(),
+  data = merged_onerow_per_sample_exon12_withoutmale
+)
+
+emm_tmb_mainmodel_exon12_withoutmale <- emmeans(mainmodel_exon12_withoutmale, ~ SMTSD)
+pairs_tmb_mainmodel_exon12_withoutmale <- pairs(emm_tmb_mainmodel_exon12_withoutmale, adjust = "BH")
+mainmodel_exon12_withoutmale
+pairs_tmb_mainmodel_exon12_withoutmale
+```
+
+```{r}
+emm_exon12_withoutmale <- emmeans(mainmodel_exon12_withoutmale, ~ SMTSD)
+levels(mainmodel_exon12_withoutmale$data$SMTSD)
+contr_exon12_withoutmale <- contrast(emm_exon12_withoutmale, method = "trt.vs.ctrl", ref = "Breast - Mammary Tissue", reverse = TRUE)
+summary(contr_exon12_withoutmale, adjust = "BH")
+```
+
+```{r}
+summary(emm_exon12_withoutmale, type = "response")
+```
+
+
+```{r}
+pairs_df_withoutmale <- as.data.frame(summary(contr_exon12_withoutmale, adjust = "BH"))
+
+pairs_df_withoutmale <- pairs_df_withoutmale %>%
+  mutate(
+    odds_ratio = exp(estimate),
+    percent_difference = odds_ratio,
+
+    lower_ci = exp(estimate - 1.96 * SE),
+    upper_ci = exp(estimate + 1.96 * SE),
+
+    sig = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE ~ ""
+    ),
+
+    # extract tissue name (Breast is already reference direction)
+    tissue = gsub("Breast - Mammary Tissue - ", "", contrast),
+    tissue = paste0(tissue, sig)
+  )
+pairs_df_withoutmale <- pairs_df_withoutmale %>%
+  mutate(
+    tissue = contrast,
+
+    # remove only "(" and ")" but keep text
+    tissue = gsub("[()]", "", tissue),
+
+    tissue = trimws(tissue)
+  )
+pairs_df_withoutmale <- pairs_df_withoutmale %>%
+  mutate(
+    tissue = gsub("Colon - Sigmoid", "Colon (Sigmoid)", tissue),
+    tissue = gsub("Colon - Transverse", "Colon (Transverse)", tissue),
+    tissue = gsub("Small Intestine - Terminal Ileum", "Small intestine", tissue),
+
+    # optional simplifications
+    tissue = gsub("Whole Blood", "Blood", tissue),
+    tissue = gsub("Breast - Mammary Tissue", "Breast", tissue)
+  )
+pairs_df_withoutmale <- pairs_df_withoutmale %>%
+  mutate(
+    tissue = paste0(tissue, sig)
+  )
+    
+ggplot(pairs_df_withoutmale,
+       aes(x = odds_ratio,
+           y = reorder(tissue, odds_ratio))) +
+  geom_point(size = 3) +
+  geom_errorbarh(
+    aes(xmin = lower_ci, xmax = upper_ci),
+    height = 0.2
+  ) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  scale_x_continuous(
+    breaks = c(1, 3, 5, 7, 9, 11, 13)
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 11),  # tissue labels
+    axis.text.x = element_text(size = 11)   # x-axis labels (optional)
+  ) +
+  labs(
+    x = "Odds ratio (Breast relative to tissue, without male breast samples)",
+    y = "Tissue comparison"
+  )
+```
+
+```{r}
+emm_thisplot_mainmodel_exon12_withoutfemale <- emmeans(mainmodel_exon12_withoutfemale, ~ SMTSD, type = "response")
+emm_thisplot_mainmodel_exon12_df_withoutfemale <- as.data.frame(emm_thisplot_mainmodel_exon12_withoutfemale)
+breast_prob_mainmodel_exon12_withoutfemale <- emm_thisplot_mainmodel_exon12_df_withoutfemale$prob[emm_thisplot_mainmodel_exon12_df_withoutfemale$SMTSD == "Breast - Mammary Tissue"]
+
+emm_thisplot_mainmodel_exon12_df_withoutfemale <- emm_thisplot_mainmodel_exon12_df_withoutfemale %>%
+  mutate(
+    fold_vs_breast = breast_prob_mainmodel_exon12_withoutfemale / prob
+  )
+```
+
+```{r}
+emm_thisplot_mainmodel_exon12_withoutmale <- emmeans(mainmodel_exon12_withoutmale, ~ SMTSD, type = "response")
+emm_thisplot_mainmodel_exon12_df_withoutmale <- as.data.frame(emm_thisplot_mainmodel_exon12_withoutmale)
+breast_prob_mainmodel_exon12_withoutmale <- emm_thisplot_mainmodel_exon12_df_withoutmale$prob[emm_thisplot_mainmodel_exon12_df_withoutmale$SMTSD == "Breast - Mammary Tissue"]
+
+emm_thisplot_mainmodel_exon12_df_withoutmale <- emm_thisplot_mainmodel_exon12_df_withoutmale %>%
+  mutate(
+    fold_vs_breast = breast_prob_mainmodel_exon12_withoutmale / prob
+  )
+```
+
+```{r}
+emm_resp_mainmodel_exon12_withoutfemale <- summary(emm_tmb_mainmodel_exon12_withoutfemale, type = "response")
+
+emm_resp_mainmodel_exon12_df_withoutfemale <- as.data.frame(emm_resp_mainmodel_exon12_withoutfemale)
+
+emm_resp_mainmodel_exon12_df_withoutfemale <- emm_resp_mainmodel_exon12_df_withoutfemale %>%
+  mutate(
+    # rename tissues
+    SMTSD = gsub("Small Intestine - Terminal Ileum", "Small Intestine", SMTSD),
+    SMTSD = gsub("Colon - Sigmoid", "Colon (Sigmoid)", SMTSD),
+    SMTSD = gsub("Colon - Transverse", "Colon (Transverse)", SMTSD),
+    SMTSD = gsub("Whole Blood", "Blood", SMTSD),
+    SMTSD = gsub("Breast - Mammary Tissue", "Breast", SMTSD),
+
+    # add percentage columns
+    prob_percent = prob * 100,
+    LCL_percent  = asymp.LCL * 100,
+    UCL_percent  = asymp.UCL * 100
+  )
+```
+```{r}
+ggplot(emm_resp_mainmodel_exon12_df_withoutfemale,
+       aes(x = reorder(SMTSD, prob),
+           y = prob_percent)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = LCL_percent, ymax = UCL_percent), width = 0.2) +
+  coord_flip() +
+  labs(
+    x = "Tissue",
+    y = "Predicted exon 12 skipping probability (%), male breast samples"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 11),
+    axis.text.x = element_text(size = 11)
+  )
+```
+
+```{r}
+emm_resp_mainmodel_exon12_withoutmale <- summary(emm_tmb_mainmodel_exon12_withoutmale, type = "response")
+
+emm_resp_mainmodel_exon12_df_withoutmale <- as.data.frame(emm_resp_mainmodel_exon12_withoutmale)
+
+emm_resp_mainmodel_exon12_df_withoutmale <- emm_resp_mainmodel_exon12_df_withoutmale %>%
+  mutate(
+    # rename tissues
+    SMTSD = gsub("Small Intestine - Terminal Ileum", "Small Intestine", SMTSD),
+    SMTSD = gsub("Colon - Sigmoid", "Colon (Sigmoid)", SMTSD),
+    SMTSD = gsub("Colon - Transverse", "Colon (Transverse)", SMTSD),
+    SMTSD = gsub("Whole Blood", "Blood", SMTSD),
+    SMTSD = gsub("Breast - Mammary Tissue", "Breast", SMTSD),
+
+    # add percentage columns
+    prob_percent = prob * 100,
+    LCL_percent  = asymp.LCL * 100,
+    UCL_percent  = asymp.UCL * 100
+  )
+```
+```{r}
+ggplot(emm_resp_mainmodel_exon12_df_withoutmale,
+       aes(x = reorder(SMTSD, prob),
+           y = prob_percent)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = LCL_percent, ymax = UCL_percent), width = 0.2) +
+  coord_flip() +
+  labs(
+    x = "Tissue",
+    y = "Predicted exon 12 skipping probability (%), female breast samples"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 11),
+    axis.text.x = element_text(size = 11)
+  )
+```
+
+
+```{r}
+breast_exon9 <- merged_onerow_per_sample_exon9 %>% filter(SMTSD == "Breast - Mammary Tissue")
+```
+```{r}
+breast_male_exon9 <- breast_exon9 %>% filter(SEX == 1) # 297 samples
+breast_female_exon9 <- breast_exon9 %>% filter(SEX == 2) # 174 samples
+```
+```{r}
+breast_male_exon9$PSI <- breast_male_exon9$skipping / 
+                   (breast_male_exon9$total_inclusion + breast_male_exon9$skipping)
+
+average_PSI_exon9 <- mean(breast_male_exon9$PSI, na.rm = TRUE)
+
+average_PSI_exon9 
+```
+```{r}
+breast_female_exon9$PSI <- breast_female_exon9$skipping / 
+                   (breast_female_exon9$total_inclusion + breast_female_exon9$skipping)
+
+average_PSI_female_exon9 <- mean(breast_female_exon9$PSI, na.rm = TRUE)
+average_PSI_female_exon9 
+```
+```{r}
+merged_onerow_per_sample_exon9_withoutmale <- merged_onerow_per_sample_exon9 %>%
+  filter(!(SEX == 1 & SMTSD == "Breast - Mammary Tissue"))
+merged_onerow_per_sample_exon9_withoutfemale <- merged_onerow_per_sample_exon9 %>%
+  filter(!(SEX == 2 & SMTSD == "Breast - Mammary Tissue"))
+```
+
+```{r}
+mainmodel_exon9_withoutfemale <- glmmTMB(
+  cbind(skipping, total_inclusion) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    RIN_number +
+    (1 | SUBJID),
+  
+  family = betabinomial(),
+  data = merged_onerow_per_sample_exon9_withoutfemale
+)
+
+emm_tmb_mainmodel_exon9_withoutfemale <- emmeans(mainmodel_exon9_withoutfemale, ~ SMTSD)
+pairs_tmb_mainmodel_exon9_withoutfemale <- pairs(emm_tmb_mainmodel_exon9_withoutfemale, adjust = "BH")
+mainmodel_exon9_withoutfemale
+pairs_tmb_mainmodel_exon9_withoutfemale
+```
+
+```{r}
+mainmodel_exon9_withoutmale <- glmmTMB(
+  cbind(skipping, total_inclusion) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    RIN_number +
+    (1 | SUBJID),
+  
+  family = betabinomial(),
+  data = merged_onerow_per_sample_exon9_withoutmale
+)
+
+emm_tmb_mainmodel_exon9_withoutmale <- emmeans(mainmodel_exon9_withoutmale, ~ SMTSD)
+pairs_tmb_mainmodel_exon9_withoutmale <- pairs(emm_tmb_mainmodel_exon9_withoutmale, adjust = "BH")
+mainmodel_exon9_withoutmale
+pairs_tmb_mainmodel_exon9_withoutmale
+```
+
+```{r}
+emm_exon9_withoutfemale <- emmeans(mainmodel_exon9_withoutfemale, ~ SMTSD)
+levels(mainmodel_exon9_withoutfemale$data$SMTSD)
+contr_exon9_withoutfemale <- contrast(emm_exon9_withoutfemale, method = "trt.vs.ctrl", ref = "Breast - Mammary Tissue", reverse = TRUE)
+summary(contr_exon9_withoutfemale, adjust = "BH")
+```
+
+```{r}
+emm_exon9_withoutmale <- emmeans(mainmodel_exon9_withoutmale, ~ SMTSD)
+levels(mainmodel_exon9_withoutmale$data$SMTSD)
+contr_exon9_withoutmale <- contrast(emm_exon9_withoutmale, method = "trt.vs.ctrl", ref = "Breast - Mammary Tissue", reverse = TRUE)
+summary(contr_exon9_withoutmale, adjust = "BH")
+```
+
+```{r}
+summary(emm_exon9_withoutfemale, type = "response")
+```
+
+
+```{r}
+summary(emm_exon9_withoutmale, type = "response")
+```
+
+```{r}
+pairs_df_withoutfemale_exon9 <- as.data.frame(summary(contr_exon9_withoutfemale, adjust = "BH"))
+
+pairs_df_withoutfemale_exon9 <- pairs_df_withoutfemale_exon9 %>%
+  mutate(
+    odds_ratio = exp(estimate),
+    percent_difference = odds_ratio,
+
+    lower_ci = exp(estimate - 1.96 * SE),
+    upper_ci = exp(estimate + 1.96 * SE),
+
+    sig = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE ~ ""
+    ),
+
+    # extract tissue name (Breast is already reference direction)
+    tissue = gsub("Breast - Mammary Tissue - ", "", contrast),
+    tissue = paste0(tissue, sig)
+  )
+pairs_df_withoutfemale_exon9 <- pairs_df_withoutfemale_exon9 %>%
+  mutate(
+    tissue = contrast,
+
+    # remove only "(" and ")" but keep text
+    tissue = gsub("[()]", "", tissue),
+
+    tissue = trimws(tissue)
+  )
+pairs_df_withoutfemale_exon9 <- pairs_df_withoutfemale_exon9 %>%
+  mutate(
+    tissue = gsub("Colon - Sigmoid", "Colon (Sigmoid)", tissue),
+    tissue = gsub("Colon - Transverse", "Colon (Transverse)", tissue),
+    tissue = gsub("Small Intestine - Terminal Ileum", "Small intestine", tissue),
+
+    # optional simplifications
+    tissue = gsub("Whole Blood", "Blood", tissue),
+    tissue = gsub("Breast - Mammary Tissue", "Breast", tissue)
+  )
+pairs_df_withoutfemale_exon9 <- pairs_df_withoutfemale_exon9 %>%
+  mutate(
+    tissue = paste0(tissue, sig)
+  )
+    
+ggplot(pairs_df_withoutfemale_exon9,
+       aes(x = odds_ratio,
+           y = reorder(tissue, odds_ratio))) +
+  geom_point(size = 3) +
+  geom_errorbarh(
+    aes(xmin = lower_ci, xmax = upper_ci),
+    height = 0.2
+  ) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  scale_x_continuous(
+    breaks = c(1, 3, 5, 7, 9, 11, 13)
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 11),  # tissue labels
+    axis.text.x = element_text(size = 11)   # x-axis labels (optional)
+  ) +
+  labs(
+    x = "Odds ratio (Breast relative to tissue, without female breast samples)",
+    y = "Tissue comparison"
+  )
+```
+
+
+```{r}
+pairs_df_withoutmale_exon9 <- as.data.frame(summary(contr_exon9_withoutmale, adjust = "BH"))
+
+pairs_df_withoutmale_exon9 <- pairs_df_withoutmale_exon9 %>%
+  mutate(
+    odds_ratio = exp(estimate),
+    percent_difference = odds_ratio,
+
+    lower_ci = exp(estimate - 1.96 * SE),
+    upper_ci = exp(estimate + 1.96 * SE),
+
+    sig = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE ~ ""
+    ),
+
+    # extract tissue name (Breast is already reference direction)
+    tissue = gsub("Breast - Mammary Tissue - ", "", contrast),
+    tissue = paste0(tissue, sig)
+  )
+pairs_df_withoutmale_exon9 <- pairs_df_withoutmale_exon9 %>%
+  mutate(
+    tissue = contrast,
+
+    # remove only "(" and ")" but keep text
+    tissue = gsub("[()]", "", tissue),
+
+    tissue = trimws(tissue)
+  )
+pairs_df_withoutmale_exon9 <- pairs_df_withoutmale_exon9 %>%
+  mutate(
+    tissue = gsub("Colon - Sigmoid", "Colon (Sigmoid)", tissue),
+    tissue = gsub("Colon - Transverse", "Colon (Transverse)", tissue),
+    tissue = gsub("Small Intestine - Terminal Ileum", "Small intestine", tissue),
+
+    # optional simplifications
+    tissue = gsub("Whole Blood", "Blood", tissue),
+    tissue = gsub("Breast - Mammary Tissue", "Breast", tissue)
+  )
+pairs_df_withoutmale_exon9 <- pairs_df_withoutmale_exon9 %>%
+  mutate(
+    tissue = paste0(tissue, sig)
+  )
+    
+ggplot(pairs_df_withoutmale_exon9,
+       aes(x = odds_ratio,
+           y = reorder(tissue, odds_ratio))) +
+  geom_point(size = 3) +
+  geom_errorbarh(
+    aes(xmin = lower_ci, xmax = upper_ci),
+    height = 0.2
+  ) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  scale_x_continuous(
+    breaks = c(1, 3, 5, 7, 9, 11, 13)
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 11),  # tissue labels
+    axis.text.x = element_text(size = 11)   # x-axis labels (optional)
+  ) +
+  labs(
+    x = "Odds ratio (Breast relative to tissue, without male breast samples)",
+    y = "Tissue comparison"
+  )
+```
+
+
+```{r}
+pairs_df_exon9 <- as.data.frame(summary(contr_exon9, adjust = "BH"))
+
+pairs_df_exon9 <- pairs_df_exon9 %>%
+  mutate(
+    odds_ratio = exp(estimate),
+    percent_difference = odds_ratio,
+
+    lower_ci = exp(estimate - 1.96 * SE),
+    upper_ci = exp(estimate + 1.96 * SE),
+
+    sig = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE ~ ""
+    ),
+
+    # extract tissue name (Breast is already reference direction)
+    tissue = gsub("Breast - Mammary Tissue - ", "", contrast),
+    tissue = paste0(tissue, sig)
+  )
+pairs_df_exon9 <- pairs_df_exon9 %>%
+  mutate(
+    tissue = contrast,
+
+    # remove only "(" and ")" but keep text
+    tissue = gsub("[()]", "", tissue),
+
+    tissue = trimws(tissue)
+  )
+pairs_df_exon9 <- pairs_df_exon9 %>%
+  mutate(
+    tissue = gsub("Colon - Sigmoid", "Colon (Sigmoid)", tissue),
+    tissue = gsub("Colon - Transverse", "Colon (Transverse)", tissue),
+    tissue = gsub("Small Intestine - Terminal Ileum", "Small intestine", tissue),
+
+    # optional simplifications
+    tissue = gsub("Whole Blood", "Blood", tissue),
+    tissue = gsub("Breast - Mammary Tissue", "Breast", tissue)
+  )
+pairs_df_exon9 <- pairs_df_exon9 %>%
+  mutate(
+    tissue = paste0(tissue, sig)
+  )
+    
+ggplot(pairs_df_exon9,
+       aes(x = odds_ratio,
+           y = reorder(tissue, odds_ratio))) +
+  geom_point(size = 3) +
+  geom_errorbarh(
+    aes(xmin = lower_ci, xmax = upper_ci),
+    height = 0.2
+  ) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  scale_x_continuous(
+    breaks = c(1, 3, 5, 7, 9, 11, 13)
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 11),  # tissue labels
+    axis.text.x = element_text(size = 11)   # x-axis labels (optional)
+  ) +
+  labs(
+    x = "Odds ratio (Breast relative to tissue)",
+    y = "Tissue comparison"
+  )
+```

@@ -1,0 +1,644 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+exon15skip_alltissues <- exonskipping_ENST00000231790_long_tissue %>% dplyr::filter(donor_exon == 14, acceptor_exon == 16)
+intron14_15_alltissues <- normalsplicing_ENST00000231790_long_tissue %>% dplyr::filter(donor_exon == 15 | acceptor_exon == 15)
+```
+
+```{r}
+combined_alltissues_exon15 <- bind_rows(intron14_15_alltissues, exon15skip_alltissues)
+combined_alltissues_ordered_exon15 <- combined_alltissues_exon15 %>%
+  mutate(order_rank = case_when(
+    end.x == 37042267 ~ 1,
+    start.x == 	37042332 ~ 2,
+    skipped_exons == 1 ~ 3,
+    TRUE ~ 4
+  )) %>%
+  arrange(rail_id, order_rank) %>%
+  dplyr::select(-order_rank)
+# order the events : per rail_id, first row is intron 11 split read count, second row is intron 12 split read count, third row is exon 12 split read count
+
+combined_alltissues_ordered_exon15 <- combined_alltissues_ordered_exon15 %>% dplyr::select(start.x, end.x, junction_id, donor_exon, acceptor_exon, event_class, rail_id, SUBJID, counts, SMTSD, SEX, AGE, bc_auc.all_reads_annotated_bases, external_id, `star.uniquely_mapped_reads_%_both`, junction_count)
+# select only the required columns to make the dataframe simpler
+
+combined_alltissues_ordered_exon15 <- combined_alltissues_ordered_exon15 %>% dplyr::filter(!is.na(SUBJID))
+
+# remove the rows where SUBJID is NA (these are all leukemic cell samples or from studyNA, no other tissues)
+```
+```{r}
+any(is.na(combined_alltissues_ordered_exon15))
+#check for any NA's -> must return FALSE
+```
+
+```{r}
+template_exon15 <- tibble::tibble(
+  junction_id = c(21496486, 21496585, 21496495),
+  start.x = c(37040295, 37042332, 37040295),
+  end.x   = c(37042267, 37047518, 37047518),
+  donor_exon = c(14, 15, 14),
+  acceptor_exon = c(15, 16, 16),
+  event_class = c("normal splicing", "normal splicing", "exon skipping")
+)
+
+rail_meta_exon15 <- combined_alltissues_ordered_exon15 %>%
+  distinct(rail_id, SMTSD)
+# how many unique samples are in combined_tissues_ordered (is the same as how many rail_id's are in combined_tissues_ordered)
+
+expected_rows_exon15 <- rail_meta_exon15 %>%
+  crossing(template_exon15)
+# in expected, every rail_id has three columns
+# for each unique sample in combined_tissues_ordered (is in rail_meta) i want 3 columns : 1 with intron 11 splicing, intron 12 splicing and exon 12 skipping -> expected contains all the junction_id x rail_id combinations i want to see in my final dataframe
+
+existing_rows_exon15 <- combined_alltissues_ordered_exon15 %>%
+  distinct(
+    rail_id,
+    junction_id
+  ) %>%
+  mutate(exists = TRUE)
+
+# so which junction_id x rail_id combinations exist in the dataframe i already have -> is in existing keys -> i want to add the difference in junction_id x rail_id combinations between expected and existing keys to combined_tissues_ordered
+
+rows_to_add_exon15 <- expected_rows_exon15 %>%
+  left_join(existing_rows_exon15,
+            by = c("rail_id", "junction_id")) %>%
+  filter(is.na(exists)) %>%
+  dplyr::select(-exists) %>%
+  mutate(counts = 0)
+# in this code the missing junction_id x rail_id combinations are identified and stored in to_add
+
+combined_alltissues_ordered_complete_exon15 <- bind_rows(combined_alltissues_ordered_exon15, rows_to_add_exon15)
+
+#adding the missing rows to combined_tissues_ordered
+# at this point, all the rows required are present
+```
+
+```{r}
+combined_alltissues_ordered_complete_exon15 <- combined_alltissues_ordered_complete_exon15 %>%
+  mutate(order_rank = case_when(
+    end.x == 37042267 ~ 1,
+    start.x == 37042332 ~ 2,
+    event_class == "exon skipping" ~ 3,
+    TRUE ~ 4
+  )) %>%
+  arrange(rail_id, order_rank) %>%
+  dplyr::select(-order_rank)
+# rank them again in case the ranking got lost
+```
+
+```{r}
+combined_alltissues_ordered_complete_exon15 <- combined_alltissues_ordered_complete_exon15 %>%
+  mutate(junction_type = case_when(
+    junction_id == 21496486 ~ "14_15",
+    junction_id == 21496585 ~ "15_16",
+    junction_id == 21496495 ~ "14_16",
+    TRUE ~ NA_character_
+  )) %>%
+  dplyr::select(-donor_exon, -acceptor_exon)
+# replacing the donor_exon and acceptor_exon columns with junction_type column which makes the dataframe simpler and easier to work wwith
+```
+
+```{r}
+combined_alltissues_ordered_complete_exon15 <- 
+  combined_alltissues_ordered_complete_exon15 %>%
+  group_by(rail_id) %>%
+  mutate(
+    SUBJID = SUBJID[!is.na(SUBJID)][1],
+    SEX = SEX[!is.na(SEX)][1],
+    AGE = AGE[!is.na(AGE)][1],
+    bc_auc.all_reads_annotated_bases = bc_auc.all_reads_annotated_bases[!is.na(bc_auc.all_reads_annotated_bases)][1],
+    external_id = external_id[!is.na(external_id)][1],
+    `star.uniquely_mapped_reads_%_both` = `star.uniquely_mapped_reads_%_both`[!is.na(`star.uniquely_mapped_reads_%_both`)][1],
+    junction_count = junction_count[!is.na(junction_count)][1]
+  ) %>%
+  ungroup()
+# the columns with counts == 0 did not have a SUBJID but a NA value, this NA needs to be replaced with the SUBJID from the rows with the same rail_id
+```
+
+```{r}
+combined_alltissues_ordered_complete_exon15 <- combined_alltissues_ordered_complete_exon15 %>%
+  mutate(order_rank = case_when(
+    end.x == 37042267 ~ 1,
+    start.x == 37042332 ~ 2,
+    event_class == "exon skipping" ~ 3,
+    TRUE ~ 4
+  )) %>%
+  arrange(rail_id, order_rank) %>%
+  dplyr::select(-order_rank)
+# rank them again in case the ranking got lost
+```
+
+```{r}
+onerow_per_sample1_exon15 <- combined_alltissues_ordered_complete_exon15 %>%
+  dplyr::group_by(rail_id) %>%
+  dplyr::summarise(
+    total_inclusion = sum(
+      counts[junction_type == "14_15"] +
+      counts[junction_type == "15_16"],
+      na.rm = TRUE
+    ),
+    skipping = counts[junction_type == "14_16"],
+    SEX = SEX[!is.na(SEX)][1],
+    AGE = AGE[!is.na(AGE)][1],
+    SUBJID = SUBJID[!is.na(SUBJID)][1],
+    SMTSD = SMTSD[!is.na(SMTSD)][1],
+    bc_auc.all_reads_annotated_bases =
+      bc_auc.all_reads_annotated_bases[!is.na(bc_auc.all_reads_annotated_bases)][1],
+    external_id = external_id[!is.na(external_id)][1],
+    `star.uniquely_mapped_reads_%_both` = `star.uniquely_mapped_reads_%_both`[!is.na(`star.uniquely_mapped_reads_%_both`)][1],
+    junction_count = junction_count[!is.na(junction_count)][1],
+    
+    .groups = "drop"
+  )
+
+onerow_per_sample2_exon15 <- combined_alltissues_ordered_complete_exon15 %>%
+  dplyr::group_by(rail_id) %>%
+  dplyr::summarise(
+    inc_14_15 = sum(counts[junction_type == "14_15"], na.rm = TRUE),
+    inc_15_16 = sum(counts[junction_type == "15_16"], na.rm = TRUE),
+    skipping  = sum(counts[junction_type == "14_16"], na.rm = TRUE),
+
+    SEX = SEX[!is.na(SEX)][1],
+    AGE = AGE[!is.na(AGE)][1],
+    SUBJID = SUBJID[!is.na(SUBJID)][1],
+    SMTSD = SMTSD[!is.na(SMTSD)][1],
+    bc_auc.all_reads_annotated_bases =
+      bc_auc.all_reads_annotated_bases[!is.na(bc_auc.all_reads_annotated_bases)][1],
+    external_id = external_id[!is.na(external_id)][1],
+    `star.uniquely_mapped_reads_%_both` =
+      `star.uniquely_mapped_reads_%_both`[!is.na(`star.uniquely_mapped_reads_%_both`)][1],
+    junction_count = junction_count[!is.na(junction_count)][1],
+
+    .groups = "drop"
+  )
+# collapses the rows with the same rail_id into one row with a total_inclusion and skipping column -> so now per rail_id one row but still replicates present
+```
+
+```{r}
+onerow_per_sample1_collapsed_exon15 <- onerow_per_sample1_exon15 %>%
+  mutate(
+    SAMPLE_ID = external_id %>%
+      sub("\\.\\d+$", "", .) %>%         # remove .1 / .2
+      sub("-SM-.*$", "", .) %>%          # remove SM and everything after
+      sub("^(GTEX-[^-]+-[^-]+(?:-[^-]+)?).*", "\\1", .)
+  )
+
+onerow_per_sample2_collapsed_exon15 <- onerow_per_sample2_exon15 %>%
+  mutate(
+    SAMPLE_ID = external_id %>%
+      sub("\\.\\d+$", "", .) %>%         # remove .1 / .2
+      sub("-SM-.*$", "", .) %>%          # remove SM and everything after
+      sub("^(GTEX-[^-]+-[^-]+(?:-[^-]+)?).*", "\\1", .)
+  )
+```
+
+```{r}
+onerow_per_sample1_collapsed_exon15 <- onerow_per_sample1_collapsed_exon15 %>%
+  group_by(SMTSD, SAMPLE_ID) %>%
+  summarise(
+    total_inclusion = sum(total_inclusion, na.rm = TRUE),
+    skipping = sum(skipping, na.rm = TRUE),
+    
+
+    junction_count = sum(junction_count, na.rm = TRUE),
+
+    `star.uniquely_mapped_reads_%_both` =
+      mean(`star.uniquely_mapped_reads_%_both`,
+        na.rm = TRUE),
+    bc_auc.all_reads_annotated_bases =
+      mean(bc_auc.all_reads_annotated_bases, na.rm = TRUE),
+
+    SEX = dplyr::first(SEX),
+    AGE = dplyr::first(AGE),
+    SUBJID = dplyr::first(SUBJID),
+
+    rail_id = paste(sort(unique(rail_id)), collapse = ","),
+    external_id = paste(sort(unique(external_id)), collapse = ","),
+
+    .groups = "drop"
+  )
+
+onerow_per_sample2_collapsed_exon15 <- onerow_per_sample2_collapsed_exon15 %>%
+  group_by(SMTSD, SAMPLE_ID) %>%
+  summarise(
+    inc_14_15 = sum(inc_14_15, na.rm = TRUE),
+    inc_15_16 = sum(inc_15_16, na.rm = TRUE),
+    skipping = sum(skipping, na.rm = TRUE),
+    
+    junction_count = sum(junction_count, na.rm = TRUE),
+
+    `star.uniquely_mapped_reads_%_both` =
+      mean(`star.uniquely_mapped_reads_%_both`,
+        na.rm = TRUE),
+    bc_auc.all_reads_annotated_bases =
+      mean(bc_auc.all_reads_annotated_bases, na.rm = TRUE),
+
+    SEX = dplyr::first(SEX),
+    AGE = dplyr::first(AGE),
+    SUBJID = dplyr::first(SUBJID),
+
+    rail_id = paste(sort(unique(rail_id)), collapse = ","),
+    external_id = paste(sort(unique(external_id)), collapse = ","),
+
+    .groups = "drop"
+  )
+```
+
+```{r}
+onerow_per_sample1_collapsed_exon15 <- onerow_per_sample1_collapsed_exon15 %>%
+  group_by(SUBJID, SMTSD) %>%
+  summarise(
+    total_inclusion = sum(total_inclusion, na.rm = TRUE),
+    skipping = sum(skipping, na.rm = TRUE),
+    SEX = dplyr::first(SEX),
+    AGE = dplyr::first(AGE),
+    junction_count = sum(junction_count, na.rm = TRUE),
+
+    `star.uniquely_mapped_reads_%_both` =
+      mean(`star.uniquely_mapped_reads_%_both`,
+        na.rm = TRUE),
+    bc_auc.all_reads_annotated_bases =
+      mean(bc_auc.all_reads_annotated_bases, na.rm = TRUE),
+
+    rail_id = paste(sort(unique(rail_id)), collapse = ","),
+    external_id = paste(sort(unique(external_id)), collapse = ","),
+    SAMPLE_ID = paste(sort(unique(SAMPLE_ID)), collapse = ","),
+    
+    .groups = "drop"
+  )
+
+onerow_per_sample2_collapsed_exon15 <- onerow_per_sample2_collapsed_exon15 %>%
+  group_by(SUBJID, SMTSD) %>%
+  summarise(
+    inc_14_15 = sum(inc_14_15, na.rm = TRUE),
+    inc_15_16 = sum(inc_15_16, na.rm = TRUE),
+    skipping = sum(skipping, na.rm = TRUE),
+    SEX = dplyr::first(SEX),
+    AGE = dplyr::first(AGE),
+    junction_count = sum(junction_count, na.rm = TRUE),
+
+    `star.uniquely_mapped_reads_%_both` =
+      mean(`star.uniquely_mapped_reads_%_both`,
+        na.rm = TRUE),
+    bc_auc.all_reads_annotated_bases =
+      mean(bc_auc.all_reads_annotated_bases, na.rm = TRUE),
+
+    rail_id = paste(sort(unique(rail_id)), collapse = ","),
+    external_id = paste(sort(unique(external_id)), collapse = ","),
+    SAMPLE_ID = paste(sort(unique(SAMPLE_ID)), collapse = ","),
+    
+    .groups = "drop"
+  )
+```
+
+```{r}
+selected_tissues <- c("Breast - Mammary Tissue",
+                      "Colon - Sigmoid",
+                      "Colon - Transverse",
+                      "Uterus",
+                      "Stomach",
+                      "Small Intestine - Terminal Ileum",
+                      "Pancreas",
+                      "Ovary",
+                      "Prostate",
+                      "Liver",
+                      "Whole Blood")
+selected_tissues_subset1_exon15 <- onerow_per_sample1_collapsed_exon15 %>%
+  filter(SMTSD %in% selected_tissues)
+
+selected_tissues_subset2_exon15 <- onerow_per_sample2_collapsed_exon15 %>%
+  filter(SMTSD %in% selected_tissues)
+#make a subset out of the per_sample_filtered dataframe  
+```
+
+```{r}
+merged_selected_tissues_subset1_exon15 <- selected_tissues_subset1_exon15 %>%
+  left_join(
+    mlh1_alltissues_cpm %>%
+      dplyr::select(sample_ids, mlh1_cpm, raw_counts),
+    by = c("external_id" = "sample_ids")
+  )
+
+merged_selected_tissues_subset2_exon15 <- selected_tissues_subset2_exon15 %>%
+  left_join(
+    mlh1_alltissues_cpm %>%
+      dplyr::select(sample_ids, mlh1_cpm, raw_counts),
+    by = c("external_id" = "sample_ids")
+  )
+```
+
+```{r}
+merged_selected_tissues_subset1_exon15$AGE <- as.factor(merged_selected_tissues_subset1_exon15$AGE)
+merged_selected_tissues_subset1_exon15$SEX <- as.factor(merged_selected_tissues_subset1_exon15$SEX)
+
+merged_selected_tissues_subset2_exon15$AGE <- as.factor(merged_selected_tissues_subset2_exon15$AGE)
+merged_selected_tissues_subset2_exon15$SEX <- as.factor(merged_selected_tissues_subset2_exon15$SEX)
+```
+
+```{r}
+quantile(merged_selected_tissues_subset1_exon15$total_inclusion, probs = c(0.1, 0.25, 0.5, 0.75))
+
+merged_selected_tissues_subset2_exon15 <- merged_selected_tissues_subset2_exon15 %>%
+  mutate(
+    total_inclusion = inc_14_15 + inc_15_16)
+
+quantile(merged_selected_tissues_subset2_exon15$total_inclusion, probs = c(0.1, 0.25, 0.5, 0.75))
+```
+
+```{r}
+merged_selected_tissues_subset1_exon15_filtered <- merged_selected_tissues_subset1_exon15 %>%
+  filter(total_inclusion > 26)
+#filter the samples with low read counts
+
+merged_selected_tissues_subset2_exon15_filtered <- merged_selected_tissues_subset2_exon15 %>%
+  filter(total_inclusion > 26)
+#filter the samples with low read counts
+```
+
+```{r}
+table(merged_selected_tissues_subset1_exon15$SMTSD)
+# look how many samples per tissue are left over after filtering
+
+table(merged_selected_tissues_subset1_exon15_filtered$SMTSD)
+# look how many samples per tissue are left over after filtering
+```
+
+```{r}
+saveRDS(merged_selected_tissues_subset1_exon15, file = "merged_selected_tissues_subset1_exon15.rds")
+saveRDS(merged_selected_tissues_subset2_exon15, file = "merged_selected_tissues_subset2_exon15.rds")
+saveRDS(merged_selected_tissues_subset1_exon15_filtered, file = "merged_selected_tissues_subset1_exon15_filtered.rds")
+saveRDS(merged_selected_tissues_subset2_exon15_filtered, file = "merged_selected_tissues_subset2_exon15_filtered.rds")
+```
+
+```{r}
+merged_selected_tissues_subset1_exon15 <- readRDS("merged_selected_tissues_subset1_exon15.rds")
+
+merged_selected_tissues_subset2_exon15 <- readRDS("merged_selected_tissues_subset2_exon15.rds")
+
+merged_selected_tissues_subset1_exon15_filtered <- readRDS("merged_selected_tissues_subset1_exon15_filtered.rds")
+
+merged_selected_tissues_subset2_exon15_filtered <- readRDS("merged_selected_tissues_subset2_exon15_filtered.rds")
+```
+
+
+
+
+
+
+```{r}
+# filtered model with all the covariats
+model_tmb_exon15_filtered_covariats <- glmmTMB(
+  cbind(skipping, total_inclusion) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    scale(bc_auc.all_reads_annotated_bases) +
+    scale(`star.uniquely_mapped_reads_%_both`) +
+    scale(junction_count) +
+    scale(mlh1_cpm) + 
+    (1 | SUBJID),
+  
+  family = betabinomial(),
+  data = merged_selected_tissues_subset1_exon15_filtered
+)
+
+emm_tmb_exon15_filtered_covariats <- emmeans(model_tmb_exon15_filtered_covariats, ~ SMTSD)
+pairs_tmb_exon15_filtered_covariats <- pairs(emm_tmb_exon15_filtered_covariats, adjust = "BH")
+model_tmb_exon15_filtered_covariats
+pairs_tmb_exon15_filtered_covariats
+```
+```{r}
+emm_thisplot_exon15_filtered_covariats <- emmeans(model_tmb_exon15_filtered_covariats, ~ SMTSD, type = "response")
+emm_thisplot_exon15_filtered_covariats_df <- as.data.frame(emm_thisplot_exon15_filtered_covariats)
+breast_prob_exon15_filtered_covariats <- emm_thisplot_exon15_filtered_covariats_df$prob[emm_thisplot_exon15_filtered_covariats_df$SMTSD == "Breast - Mammary Tissue"]
+
+emm_thisplot_exon15_filtered_covariats_df <- emm_thisplot_exon15_filtered_covariats_df %>%
+  mutate(
+    fold_vs_breast = breast_prob_exon15_filtered_covariats / prob
+  )
+```
+
+```{r}
+# unfiltered model without all the covariats (simplest model)
+model_tmb_exon15_base <- glmmTMB(
+  cbind(skipping, total_inclusion) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    (1 | SUBJID),
+  
+  family = betabinomial(),
+  data = merged_selected_tissues_subset1_exon15
+)
+
+emm_tmb_exon15_base <- emmeans(model_tmb_exon15_base, ~ SMTSD)
+pairs_tmb_exon15_base <- pairs(emm_tmb_exon15_base, adjust = "BH")
+model_tmb_exon15_base
+pairs_tmb_exon15_base
+```
+```{r}
+emm_thisplot_exon15_base <- emmeans(model_tmb_exon15_base, ~ SMTSD, type = "response")
+emm_thisplot_exon15_base_df <- as.data.frame(emm_thisplot_exon15_base)
+breast_prob_exon15_base <- emm_thisplot_exon15_base_df$prob[emm_thisplot_exon15_base_df$SMTSD == "Breast - Mammary Tissue"]
+
+emm_thisplot_exon15_base_df <- emm_thisplot_exon15_base_df %>%
+  mutate(
+    fold_vs_breast = breast_prob_exon15_base / prob
+  )
+```
+
+```{r}
+# compare models
+emm_thisplot_exon15_base_df
+emm_thisplot_exon15_filtered_covariats_df
+```
+
+```{r}
+# start of plots for the base model
+```
+
+```{r}
+exon15_dist_exact_base1 <- merged_selected_tissues_subset1_exon15 %>%
+  mutate(
+    skipping_capped = ifelse(skipping >= 10, "10+", as.character(skipping))
+  ) %>%
+  group_by(SMTSD, skipping_capped) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(SMTSD) %>%
+  mutate(
+    total_tissue = sum(n),
+    pct = 100 * n / total_tissue
+  )
+
+ggplot(
+  exon15_dist_exact_base1,
+  aes(
+    x = factor(skipping_capped,
+               levels = c(as.character(0:9), "10+")),
+    y = pct
+  )
+) +
+  geom_col(fill = "steelblue", width = 1.0) +
+  geom_text(
+    aes(label = sprintf("%.1f%%", pct)),
+    vjust = -0.3,
+    size = 1.5
+  ) +
+  facet_wrap(~ SMTSD) +
+  theme_classic() +
+  labs(
+    x = "Exon 15 skipping read count",
+    y = "Percentage of samples within tissue"
+  ) +
+  ylim(0, max(exon15_dist_exact_base1$pct) * 1.1)
+```
+```{r}
+exon15_dist_exact_base2 <- merged_selected_tissues_subset1_exon15 %>%
+  mutate(
+    psi_sum = skipping / (skipping + total_inclusion),
+    psi_bin = cut(
+      psi_sum,
+      breaks = c(
+        0,
+        0.001,
+        0.005,
+        0.01,
+        0.02,
+        0.05,
+        0.1,
+        0.2,
+        1
+      ),
+      include.lowest = TRUE
+    )
+  ) %>%
+  group_by(SMTSD, psi_bin) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(SMTSD) %>%
+  mutate(pct = 100 * n / sum(n))
+
+ggplot(exon15_dist_exact_base2, aes(x = psi_bin, y = pct)) +
+  geom_col(fill = "steelblue", width = 1) +
+  geom_text(
+    aes(label = sprintf("%.1f%%", pct)),
+    vjust = -0.3,
+    size = 1.8
+  ) +
+  facet_wrap(~ SMTSD) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 5, angle = 45, hjust = 1)) +
+  labs(
+    x = "PSI bin",
+    y = "Percentage of samples within tissue"
+  ) +
+  ylim(0, max(exon15_dist_exact_base2$pct) * 1.1)
+```
+```{r}
+pairs_tmb_exon15_base_df_nonlog <- as.data.frame(pairs_tmb_exon15_base)
+
+# Filter Breast comparisons
+pairs_tmb_exon15_base_df_nonlog <- pairs_tmb_exon15_base_df_nonlog %>%
+  filter(grepl("Breast - Mammary Tissue", contrast))
+
+# Compute effects + significance + modified labels
+pairs_tmb_exon15_base_df_nonlog <- pairs_tmb_exon15_base_df_nonlog %>%
+  mutate(
+    odds_ratio = exp(estimate),
+    percent_difference = (odds_ratio - 1) * 100,
+    lower_ci = (exp(estimate - 1.96 * SE) - 1) * 100,
+    upper_ci = (exp(estimate + 1.96 * SE) - 1) * 100,
+
+    sig = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE ~ ""
+    ),
+
+    # clean tissue label + add stars
+    tissue = gsub(".*Breast - Mammary Tissue - ", "", contrast),
+    tissue = paste0(tissue, sig)
+  )
+
+# Plot with stars in labels
+ggplot(pairs_tmb_exon15_base_df_nonlog,
+       aes(x = percent_difference, y = reorder(tissue, percent_difference))) +
+  geom_point(size = 3) +
+  geom_errorbarh(
+    aes(xmin = lower_ci, xmax = upper_ci),
+    height = 0.2
+  ) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  theme_minimal() +
+  labs(
+    x = "Percent difference in exon skipping odds vs Breast",
+    y = "Tissue"
+  )
+```
+```{r}
+emm_resp_exon15_base <- summary(emm_tmb_exon15_base, type = "response")
+emm_resp_exon15_base_df <- as.data.frame(emm_resp_exon15_base)
+ggplot(emm_resp_exon15_base_df, aes(x = reorder(SMTSD, prob), y = prob)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.2) +
+  coord_flip() +
+  labs(
+    x = "Tissue",
+    y = "Predicted exon skipping proportion",
+    title = "MLH1 exon skipping across tissues"
+  ) +
+  theme_minimal()
+```
+```{r}
+model_tmb_exon15_base_intron15 <- glmmTMB(
+  cbind(skipping, inc_15_16) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    (1 | SUBJID),
+  
+  family = betabinomial(),
+  data = merged_selected_tissues_subset2_exon15
+)
+
+emm_tmb_exon15_base_intron15 <- emmeans(model_tmb_exon15_base_intron15, ~ SMTSD)
+pairs_tmb_exon15_base_intron15 <- pairs(emm_tmb_exon15_base_intron15, adjust = "BH")
+model_tmb_exon15_base_intron15
+pairs_tmb_exon15_base_intron15
+```
+```{r}
+emm_thisplot_exon15_base_intron15 <- emmeans(model_tmb_exon15_base_intron15, ~ SMTSD, type = "response")
+emm_thisplot_exon15_base_intron15_df <- as.data.frame(emm_thisplot_exon15_base_intron15)
+breast_prob_exon15_base_intron15 <- emm_thisplot_exon15_base_intron15_df$prob[emm_thisplot_exon15_base_intron15_df$SMTSD == "Breast - Mammary Tissue"]
+
+emm_thisplot_exon15_base_intron15_df <- emm_thisplot_exon15_base_intron15_df %>%
+  mutate(
+    fold_vs_breast = breast_prob_exon15_base_intron15 / prob
+  )
+emm_thisplot_exon15_base_intron15_df
+```
+```{r}
+emm_resp_exon15_base_intron15 <- summary(emm_tmb_exon15_base_intron15, type = "response")
+emm_response_exon15_base_intron15_df <- as.data.frame(emm_resp_exon15_base_intron15)
+ggplot(emm_response_exon15_base_intron15_df, aes(x = reorder(SMTSD, prob), y = prob)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.2) +
+  coord_flip() +
+  labs(
+    x = "Tissue",
+    y = "Predicted exon skipping proportion",
+    title = "MLH1 exon skipping across tissues"
+  ) +
+  theme_minimal()
+```
+
+
+
+
+
