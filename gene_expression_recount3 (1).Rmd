@@ -1,0 +1,729 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(SummarizedExperiment)
+rse_breast_gene <- recount3::create_rse_manual(
+    project = "BREAST",
+    project_home = "data_sources/gtex",
+    organism = "human",
+    annotation = "gencode_v26",
+    type = "gene"
+)
+```
+```{r}
+counts_breast_gene <- assay(rse_breast_gene)
+
+mlh1_counts_breast <- counts_breast_gene[
+  rowData(rse_breast_gene)$gene_name == "MLH1",
+]
+
+lib_sizes_breast <- colSums(counts_breast_gene)
+
+lib_sizes_breast_df <- data.frame(
+  sample_id = names(lib_sizes_breast),
+  lib_size  = as.numeric(lib_sizes_breast)
+)
+mlh1_counts_breast_df <- data.frame(
+  sample_id = names(mlh1_counts_breast),
+  raw_counts  = as.numeric(mlh1_counts_breast)
+)
+mlh1_breast_counts_df_merged <- merge(
+  mlh1_counts_breast_df,
+  lib_sizes_breast_df,
+  by.x = "sample_id",
+  by.y = "sample_id",
+  all.x = TRUE
+)
+meta_breast <- as.data.frame(colData(rse_breast_gene))
+meta_breast <- meta_breast[, c("external_id", "gtex.smtsd")]
+mlh1_breast_counts <- merge(
+  mlh1_breast_counts_df_merged,
+  meta_breast,
+  by.x = "sample_id",
+  by.y = "external_id",
+  all.x = TRUE
+)
+```
+
+```{r}
+rse_colon_gene <- recount3::create_rse_manual(
+    project = "COLON",
+    project_home = "data_sources/gtex",
+    organism = "human",
+    annotation = "gencode_v26",
+    type = "gene"
+)
+```
+```{r}
+counts_colon_gene <- assay(rse_colon_gene)
+
+mlh1_counts_colon <- counts_colon_gene[
+  rowData(rse_colon_gene)$gene_name == "MLH1",
+]
+
+lib_sizes_colon <- colSums(counts_colon_gene)
+lib_sizes_colon_df <- data.frame(
+  sample_id = names(lib_sizes_colon),
+  lib_size  = as.numeric(lib_sizes_colon)
+)
+mlh1_counts_colon_df <- data.frame(
+  sample_id = names(mlh1_counts_colon),
+  raw_counts  = as.numeric(mlh1_counts_colon)
+)
+mlh1_colon_counts_df_merged <- merge(
+  mlh1_counts_colon_df,
+  lib_sizes_colon_df,
+  by.x = "sample_id",
+  by.y = "sample_id",
+  all.x = TRUE
+)
+meta_colon <- as.data.frame(colData(rse_colon_gene))
+meta_colon <- meta_colon[, c("external_id", "gtex.smtsd")]
+mlh1_colon_counts_df_merged2 <- merge(
+  mlh1_colon_counts_df_merged,
+  meta_colon,
+  by.x = "sample_id",
+  by.y = "external_id",
+  all.x = TRUE
+)
+
+mlh1_colontransverse_counts <- mlh1_colon_counts_df_merged2 %>% filter(gtex.smtsd == "Colon - Transverse")
+mlh1_colonsigmoid_counts <- mlh1_colon_counts_df_merged2 %>% filter(gtex.smtsd == "Colon - Sigmoid")
+```
+
+```{r}
+rse_stomach_gene <- recount3::create_rse_manual(
+    project = "STOMACH",
+    project_home = "data_sources/gtex",
+    organism = "human",
+    annotation = "gencode_v26",
+    type = "gene"
+)
+```
+```{r}
+counts_stomach_gene <- assay(rse_stomach_gene)
+
+mlh1_counts_stomach <- counts_stomach_gene[
+  rowData(rse_stomach_gene)$gene_name == "MLH1",
+]
+
+lib_sizes_stomach <- colSums(counts_stomach_gene)
+
+lib_sizes_stomach_df <- data.frame(
+  sample_id = names(lib_sizes_stomach),
+  lib_size  = as.numeric(lib_sizes_stomach)
+)
+mlh1_counts_stomach_df <- data.frame(
+  sample_id = names(mlh1_counts_stomach),
+  raw_counts  = as.numeric(mlh1_counts_stomach)
+)
+mlh1_stomach_counts_df_merged <- merge(
+  mlh1_counts_stomach_df,
+  lib_sizes_stomach_df,
+  by.x = "sample_id",
+  by.y = "sample_id",
+  all.x = TRUE
+)
+meta_stomach <- as.data.frame(colData(rse_stomach_gene))
+meta_stomach <- meta_stomach[, c("external_id", "gtex.smtsd")]
+mlh1_stomach_counts <- merge(
+  mlh1_stomach_counts_df_merged,
+  meta_stomach,
+  by.x = "sample_id",
+  by.y = "external_id",
+  all.x = TRUE
+)
+```
+
+```{r}
+rse_pancreas_gene <- recount3::create_rse_manual(
+    project = "PANCREAS",
+    project_home = "data_sources/gtex",
+    organism = "human",
+    annotation = "gencode_v26",
+    type = "gene"
+)
+```
+```{r}
+counts_pancreas_gene <- assay(rse_pancreas_gene)
+
+mlh1_counts_pancreas <- counts_pancreas_gene[
+  rowData(rse_pancreas_gene)$gene_name == "MLH1",
+]
+
+lib_sizes_pancreas <- colSums(counts_pancreas_gene)
+
+lib_sizes_pancreas_df <- data.frame(
+  sample_id = names(lib_sizes_pancreas),
+  lib_size  = as.numeric(lib_sizes_pancreas)
+)
+mlh1_counts_pancreas_df <- data.frame(
+  sample_id = names(mlh1_counts_pancreas),
+  raw_counts  = as.numeric(mlh1_counts_pancreas)
+)
+mlh1_pancreas_counts_df_merged <- merge(
+  mlh1_counts_pancreas_df,
+  lib_sizes_pancreas_df,
+  by.x = "sample_id",
+  by.y = "sample_id",
+  all.x = TRUE
+)
+meta_pancreas <- as.data.frame(colData(rse_pancreas_gene))
+meta_pancreas <- meta_pancreas[, c("external_id", "gtex.smtsd")]
+mlh1_pancreas_counts <- merge(
+  mlh1_pancreas_counts_df_merged,
+  meta_pancreas,
+  by.x = "sample_id",
+  by.y = "external_id",
+  all.x = TRUE
+)
+```
+
+```{r}
+rse_prostate_gene <- recount3::create_rse_manual(
+    project = "PROSTATE",
+    project_home = "data_sources/gtex",
+    organism = "human",
+    annotation = "gencode_v26",
+    type = "gene"
+)
+```
+```{r}
+counts_prostate_gene <- assay(rse_prostate_gene)
+
+mlh1_counts_prostate <- counts_prostate_gene[
+  rowData(rse_prostate_gene)$gene_name == "MLH1",
+]
+
+lib_sizes_prostate <- colSums(counts_prostate_gene)
+
+lib_sizes_prostate_df <- data.frame(
+  sample_id = names(lib_sizes_prostate),
+  lib_size  = as.numeric(lib_sizes_prostate)
+)
+mlh1_counts_prostate_df <- data.frame(
+  sample_id = names(mlh1_counts_prostate),
+  raw_counts  = as.numeric(mlh1_counts_prostate)
+)
+mlh1_prostate_counts_df_merged <- merge(
+  mlh1_counts_prostate_df,
+  lib_sizes_prostate_df,
+  by.x = "sample_id",
+  by.y = "sample_id",
+  all.x = TRUE
+)
+meta_prostate <- as.data.frame(colData(rse_prostate_gene))
+meta_prostate <- meta_prostate[, c("external_id", "gtex.smtsd")]
+mlh1_prostate_counts <- merge(
+  mlh1_prostate_counts_df_merged,
+  meta_prostate,
+  by.x = "sample_id",
+  by.y = "external_id",
+  all.x = TRUE
+)
+```
+
+```{r}
+rse_liver_gene <- recount3::create_rse_manual(
+    project = "LIVER",
+    project_home = "data_sources/gtex",
+    organism = "human",
+    annotation = "gencode_v26",
+    type = "gene"
+)
+```
+```{r}
+counts_liver_gene <- assay(rse_liver_gene)
+
+mlh1_counts_liver <- counts_liver_gene[
+  rowData(rse_liver_gene)$gene_name == "MLH1",
+]
+
+lib_sizes_liver <- colSums(counts_liver_gene)
+
+lib_sizes_liver_df <- data.frame(
+  sample_id = names(lib_sizes_liver),
+  lib_size  = as.numeric(lib_sizes_liver)
+)
+mlh1_counts_liver_df <- data.frame(
+  sample_id = names(mlh1_counts_liver),
+  raw_counts  = as.numeric(mlh1_counts_liver)
+)
+mlh1_liver_counts_df_merged <- merge(
+  mlh1_counts_liver_df,
+  lib_sizes_liver_df,
+  by.x = "sample_id",
+  by.y = "sample_id",
+  all.x = TRUE
+)
+meta_liver <- as.data.frame(colData(rse_liver_gene))
+meta_liver <- meta_liver[, c("external_id", "gtex.smtsd")]
+mlh1_liver_counts <- merge(
+  mlh1_liver_counts_df_merged,
+  meta_liver,
+  by.x = "sample_id",
+  by.y = "external_id",
+  all.x = TRUE
+)
+```
+
+
+```{r}
+rse_ovary_gene <- recount3::create_rse_manual(
+    project = "OVARY",
+    project_home = "data_sources/gtex",
+    organism = "human",
+    annotation = "gencode_v26",
+    type = "gene"
+)
+```
+```{r}
+counts_ovary_gene <- assay(rse_ovary_gene)
+
+mlh1_counts_ovary <- counts_ovary_gene[
+  rowData(rse_ovary_gene)$gene_name == "MLH1",
+]
+
+lib_sizes_ovary <- colSums(counts_ovary_gene)
+
+lib_sizes_ovary_df <- data.frame(
+  sample_id = names(lib_sizes_ovary),
+  lib_size  = as.numeric(lib_sizes_ovary)
+)
+mlh1_counts_ovary_df <- data.frame(
+  sample_id = names(mlh1_counts_ovary),
+  raw_counts  = as.numeric(mlh1_counts_ovary)
+)
+mlh1_ovary_counts_df_merged <- merge(
+  mlh1_counts_ovary_df,
+  lib_sizes_ovary_df,
+  by.x = "sample_id",
+  by.y = "sample_id",
+  all.x = TRUE
+)
+meta_ovary <- as.data.frame(colData(rse_ovary_gene))
+meta_ovary <- meta_ovary[, c("external_id", "gtex.smtsd")]
+mlh1_ovary_counts <- merge(
+  mlh1_ovary_counts_df_merged,
+  meta_ovary,
+  by.x = "sample_id",
+  by.y = "external_id",
+  all.x = TRUE
+)
+```
+
+```{r}
+rse_smallintestine_gene <- recount3::create_rse_manual(
+    project = "SMALL_INTESTINE",
+    project_home = "data_sources/gtex",
+    organism = "human",
+    annotation = "gencode_v26",
+    type = "gene"
+)
+```
+```{r}
+counts_smallintestine_gene <- assay(rse_smallintestine_gene)
+
+mlh1_counts_smallintestine <- counts_smallintestine_gene[
+  rowData(rse_smallintestine_gene)$gene_name == "MLH1",
+]
+
+lib_sizes_smallintestine <- colSums(counts_smallintestine_gene)
+
+lib_sizes_smallintestine_df <- data.frame(
+  sample_id = names(lib_sizes_smallintestine),
+  lib_size  = as.numeric(lib_sizes_smallintestine)
+)
+mlh1_counts_smallintestine_df <- data.frame(
+  sample_id = names(mlh1_counts_smallintestine),
+  raw_counts  = as.numeric(mlh1_counts_smallintestine)
+)
+mlh1_smallintestine_counts_df_merged <- merge(
+  mlh1_counts_smallintestine_df,
+  lib_sizes_smallintestine_df,
+  by.x = "sample_id",
+  by.y = "sample_id",
+  all.x = TRUE
+)
+meta_smallintestine <- as.data.frame(colData(rse_smallintestine_gene))
+meta_smallintestine <- meta_smallintestine[, c("external_id", "gtex.smtsd")]
+mlh1_smallintestine_counts <- merge(
+  mlh1_smallintestine_counts_df_merged,
+  meta_smallintestine,
+  by.x = "sample_id",
+  by.y = "external_id",
+  all.x = TRUE
+)
+```
+
+```{r}
+rse_uterus_gene <- recount3::create_rse_manual(
+    project = "UTERUS",
+    project_home = "data_sources/gtex",
+    organism = "human",
+    annotation = "gencode_v26",
+    type = "gene"
+)
+```
+```{r}
+counts_uterus_gene <- assay(rse_uterus_gene)
+
+mlh1_counts_uterus <- counts_uterus_gene[
+  rowData(rse_uterus_gene)$gene_name == "MLH1",
+]
+
+lib_sizes_uterus <- colSums(counts_uterus_gene)
+
+lib_sizes_uterus_df <- data.frame(
+  sample_id = names(lib_sizes_uterus),
+  lib_size  = as.numeric(lib_sizes_uterus)
+)
+mlh1_counts_uterus_df <- data.frame(
+  sample_id = names(mlh1_counts_uterus),
+  raw_counts  = as.numeric(mlh1_counts_uterus)
+)
+mlh1_uterus_counts_df_merged <- merge(
+  mlh1_counts_uterus_df,
+  lib_sizes_uterus_df,
+  by.x = "sample_id",
+  by.y = "sample_id",
+  all.x = TRUE
+)
+meta_uterus <- as.data.frame(colData(rse_uterus_gene))
+meta_uterus <- meta_uterus[, c("external_id", "gtex.smtsd")]
+mlh1_uterus_counts <- merge(
+  mlh1_uterus_counts_df_merged,
+  meta_uterus,
+  by.x = "sample_id",
+  by.y = "external_id",
+  all.x = TRUE
+)
+```
+
+```{r}
+rse_blood_gene <- recount3::create_rse_manual(
+    project = "BLOOD",
+    project_home = "data_sources/gtex",
+    organism = "human",
+    annotation = "gencode_v26",
+    type = "gene"
+)
+```
+```{r}
+counts_blood_gene <- assay(rse_blood_gene)
+
+mlh1_counts_blood <- counts_blood_gene[
+  rowData(rse_blood_gene)$gene_name == "MLH1",
+]
+
+lib_sizes_blood <- colSums(counts_blood_gene)
+lib_sizes_blood_df <- data.frame(
+  sample_id = names(lib_sizes_blood),
+  lib_size  = as.numeric(lib_sizes_blood)
+)
+mlh1_counts_blood_df <- data.frame(
+  sample_id = names(mlh1_counts_blood),
+  raw_counts  = as.numeric(mlh1_counts_blood)
+)
+mlh1_blood_counts_df_merged <- merge(
+  mlh1_counts_blood_df,
+  lib_sizes_blood_df,
+  by.x = "sample_id",
+  by.y = "sample_id",
+  all.x = TRUE
+)
+meta_blood <- as.data.frame(colData(rse_blood_gene))
+meta_blood <- meta_blood[, c("external_id", "gtex.smtsd")]
+mlh1_blood_counts_df_merged2 <- merge(
+  mlh1_blood_counts_df_merged,
+  meta_blood,
+  by.x = "sample_id",
+  by.y = "external_id",
+  all.x = TRUE
+)
+
+
+mlh1_wholeblood_counts <- mlh1_blood_counts_df_merged2 %>% filter(gtex.smtsd == "Whole Blood")
+
+```
+
+```{r}
+mlh1_alltissues_counts <- bind_rows(mlh1_wholeblood_counts, mlh1_uterus_counts, mlh1_smallintestine_counts, mlh1_ovary_counts, mlh1_liver_counts, mlh1_prostate_counts, mlh1_pancreas_counts, mlh1_stomach_counts, mlh1_colontransverse_counts, mlh1_colonsigmoid_counts, mlh1_breast_counts)
+```
+
+```{r}
+mlh1_alltissues_counts <- mlh1_alltissues_counts %>%
+  mutate(
+    SAMPLE_ID = sample_id %>%
+      sub("\\.\\d+$", "", .) %>%         # remove .1 / .2
+      sub("-SM-.*$", "", .) %>%          # remove SM and everything after
+      sub("^(GTEX-[^-]+-[^-]+(?:-[^-]+)?).*", "\\1", .)
+  )
+```
+```{r}
+replicates_mlh1_alltissues_counts <- mlh1_alltissues_counts %>%
+  group_by(SAMPLE_ID, gtex.smtsd) %>%
+  filter(n() >= 2) %>%
+  ungroup()
+```
+
+```{r}
+mlh1_alltissues_counts_collapsed <- mlh1_alltissues_counts %>%
+  group_by(gtex.smtsd, SAMPLE_ID) %>%
+  summarise(
+    raw_counts = sum(raw_counts, na.rm = TRUE),
+    lib_size = sum(lib_size, na.rm = TRUE),
+    sample_id = paste(sort(unique(sample_id)), collapse = ","),
+    .groups = "drop"
+  )
+# collapsing technical replicates with same SAMPLE_ID x gtex.smtsd combination
+```
+```{r}
+replicates_mlh1_alltissues_counts_collapsed <- mlh1_alltissues_counts_collapsed %>%
+  group_by(SAMPLE_ID, gtex.smtsd) %>%
+  filter(n() >= 2) %>%
+  ungroup()
+```
+```{r}
+mlh1_alltissues_counts_collapsed <- mlh1_alltissues_counts_collapsed %>%
+  mutate(
+    donor_id = sub("^(GTEX-[^-]+).*", "\\1", sample_id)
+  )
+```
+
+```{r}
+mlh1_alltissues_counts_collapsed <- mlh1_alltissues_counts_collapsed %>%
+  group_by(donor_id, gtex.smtsd) %>%
+  summarise(
+    raw_counts = sum(raw_counts, na.rm = TRUE),
+    lib_size = sum(lib_size, na.rm = TRUE),
+    sample_ids = paste(sort(unique(sample_id)), collapse = ","),
+    SAMPLE_ID = paste(sort(unique(SAMPLE_ID)), collapse = ","),
+    .groups = "drop"
+  )
+# collapsing biological replicates from the same donor_id x gtex.smtsd combination
+```
+```{r}
+replicates_mlh1_alltissues_counts_collapsed <- mlh1_alltissues_counts_collapsed %>%
+  group_by(donor_id, gtex.smtsd) %>%
+  filter(n() >= 2) %>%
+  ungroup()
+```
+
+```{r}
+mlh1_alltissues_cpm <- mlh1_alltissues_counts_collapsed %>%
+  mutate(
+    mlh1_cpm = (raw_counts / lib_size) * 1e6,
+    mlh1_log1p_cpm = log1p(mlh1_cpm)
+  )
+```
+
+```{r}
+table(mlh1_alltissues_cpm$gtex.smtsd)
+```
+
+```{r}
+saveRDS(mlh1_alltissues_cpm, file = "mlh1_alltissues_cpm.rds")
+```
+```{r}
+mlh1_alltissues_cpm <- readRDS("mlh1_alltissues_cpm.rds")
+```
+
+
+```{r}
+mlh1_alltissues_cpm$gtex.smtsd <- as.factor(mlh1_alltissues_cpm$gtex.smtsd)
+library(glmmTMB)
+
+model_mlh1_expression_tmb <- glmmTMB(
+  raw_counts ~ gtex.smtsd + (1 | donor_id) +
+    offset(log(lib_size)),
+  family = nbinom2,
+  data = mlh1_alltissues_cpm
+)
+
+emm_mlh1_expression_tmb <- emmeans(model_mlh1_expression_tmb, pairwise ~ gtex.smtsd)
+
+pairs_mlh1_expression_tmb <- as.data.frame(emm_mlh1_expression_tmb$contrasts)
+pairs_mlh1_expression_tmb$fold_change <- exp(pairs_mlh1_expression_tmb$estimate)
+```
+```{r}
+model_mlh1_expression_tmb
+pairs_mlh1_expression_tmb
+```
+```{r}
+emm_response_mlh1_expression <- emmeans(
+  model_mlh1_expression_tmb,
+  ~ gtex.smtsd,
+  type = "response"
+)
+
+emm_response_mlh1_expression_df <- as.data.frame(emm_response_mlh1_expression)
+
+ggplot(
+  emm_response_mlh1_expression_df,
+  aes(x = reorder(gtex.smtsd, response), y = response)
+) +
+  geom_point(size = 2) +
+  geom_errorbar(
+    aes(
+      ymin = asymp.LCL,
+      ymax = asymp.UCL
+    ),
+    width = 0.2
+  ) +
+  coord_flip() +
+  labs(
+    x = "Tissue",
+    y = "MLH1 gene read counts"
+  ) +
+  theme_bw()
+```
+```{r}
+pairs_response_mlh1_expression_tmb <- emmeans(
+  model_mlh1_expression_tmb,
+  pairwise ~ gtex.smtsd,
+  type = "response"
+)
+
+# Convert contrasts to dataframe
+pairs_response_mlh1_expression_tmb_df <- as.data.frame(pairs_response_mlh1_expression_tmb$contrasts)
+
+# Keep only Breast comparisons
+pairs_response_mlh1_expression_tmb_df <- pairs_response_mlh1_expression_tmb_df %>%
+  filter(grepl("Breast / Mammary Tissue", contrast))
+
+# Compute fold changes and percent differences
+pairs_response_mlh1_expression_tmb_df <- pairs_response_mlh1_expression_tmb_df %>%
+  mutate(
+
+    percent_difference = (ratio - 1) * 100,
+
+    lower_ci = ((ratio / exp(1.96 * SE)) - 1) * 100,
+    upper_ci = ((ratio * exp(1.96 * SE)) - 1) * 100,
+
+    sig = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE ~ ""
+    ),
+
+    tissue = gsub(".*Breast / Mammary Tissue - ", "", contrast),
+    tissue = paste0(tissue, sig)
+  )
+pairs_response_mlh1_expression_tmb_df <- pairs_response_mlh1_expression_tmb_df %>%
+  mutate(
+    contrast = gsub("\\s*/\\s*", " - ", contrast)
+  )
+# Plot
+ggplot(
+  pairs_response_mlh1_expression_tmb_df,
+  aes(
+    x = percent_difference,
+    y = reorder(contrast, percent_difference)
+  )
+) +
+  geom_point(size = 3) +
+  geom_errorbarh(
+    aes(
+      xmin = lower_ci,
+      xmax = upper_ci
+    ),
+    height = 0.2
+  ) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  theme_minimal() +
+  labs(
+    x = "Percent difference in MLH1 expression vs Breast",
+    y = "Tissue comparisons"
+  )
+```
+
+
+
+```{r}
+
+```
+
+
+
+
+
+
+```{r}
+library(lme4)
+
+model_mlh1_expression <- lmer(
+  mlh1_cpm ~ gtex.smtsd + (1 | donor_id),
+  data = mlh1_alltissues_cpm
+)
+model_mlh1_expression_log <- lmer(
+  mlh1_log1p_cpm ~ gtex.smtsd + (1 | donor_id),
+  data = mlh1_alltissues_cpm
+)
+```
+```{r}
+plot(model_mlh1_expression, which = 1, main = "Raw MLH1 CPM")
+plot(model_mlh1_expression_log, which = 1, main = "Log1p MLH1 CPM")
+```
+```{r}
+qqnorm(resid(model_mlh1_expression))
+qqline(resid(model_mlh1_expression))
+title("QQ plot - raw CPM")
+qqnorm(resid(model_mlh1_expression_log))
+qqline(resid(model_mlh1_expression_log))
+title("QQ plot - log1p CPM")
+```
+```{r}
+par(mfrow = c(1, 2))
+
+hist(mlh1_alltissues_cpm$mlh1_cpm,
+     main = "Raw CPM",
+     breaks = 50)
+
+hist(mlh1_alltissues_cpm$mlh1_log1p_cpm,
+     main = "Log1p CPM",
+     breaks = 50)
+```
+
+```{r}
+emm_mlh1_expression_df <- as.data.frame(emm_mlh1_expression)
+
+ggplot(emm_mlh1_expression_df, aes(x = reorder(gtex.smtsd, emmean), y = emmean)) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.2) +
+  coord_flip() +
+  labs(x = "Tissue", y = "Adjusted MLH1 CPM") +
+  theme_bw()
+```
+
+
+
+
+
+
+
+
+
+
+```{r}
+model_mlh1_expression
+```
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,534 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+exon10skip_filteredtissues <- merged_exonskipping_long %>% dplyr::filter(donor_exon == 9, acceptor_exon == 11)
+intron9_10_filteredtissues <- merged_normalsplicing_long %>% dplyr::filter(donor_exon == 10 | acceptor_exon == 10)
+```
+
+```{r}
+combined_filteredtissues_exon10 <- bind_rows(intron9_10_filteredtissues, exon10skip_filteredtissues)
+combined_filteredtissues_ordered_exon10 <- combined_filteredtissues_exon10 %>%
+  mutate(order_rank = case_when(
+    end.x == 37017505 ~ 1,
+    start.x == 37017600 ~ 2,
+    skipped_exons == 1 ~ 3,
+    TRUE ~ 4
+  )) %>%
+  arrange(sample, order_rank) %>%
+  dplyr::select(-order_rank)
+# order the events : per rail_id, first row is intron 11 split read count, second row is intron 12 split read count, third row is exon 12 split read count
+
+combined_filteredtissues_ordered_exon10 <- combined_filteredtissues_ordered_exon10 %>% dplyr::select(start.x, end.x, junction_id.x, donor_exon, acceptor_exon, event_class, gtex.subjid, read_counts, gtex.smtsd, gtex.sex, gtex.age, recount_qc.bc_auc.all_reads_annotated_bases, sample, `recount_qc.star.uniquely_mapped_reads_._both`, recount_qc.junction_avg_coverage, gtex.smrin, gtex.smnabtch, gtex.smgebtch, gtex.dthhrdy)
+# select only the required columns to make the dataframe simpler
+```
+```{r}
+any(is.na(combined_filteredtissues_ordered_exon10))
+#check for any NA's -> must return FALSE
+na_cols_exon10 <- combined_filteredtissues_ordered_exon10 %>%
+  dplyr::select(where(~ any(is.na(.))))
+na_rows_exon10 <- combined_filteredtissues_ordered_exon10 %>%
+  filter(if_any(everything(), is.na))
+# only Na's in gtex.dthhrry
+```
+
+```{r}
+combined_filteredtissues_ordered_exon10 <- combined_filteredtissues_ordered_exon10 %>%
+  mutate(junction_type = case_when(
+    junction_id.x == 3701454537017505 ~ "9_10",
+    junction_id.x == 3701760037020309 ~ "10_11",
+    junction_id.x == 3701454537020309 ~ "9_11",
+    TRUE ~ NA_character_
+  )) %>%
+  dplyr::select(-donor_exon, -acceptor_exon)
+```
+
+```{r}
+combined_filteredtissues_ordered_exon10 <- combined_filteredtissues_ordered_exon10 %>%
+  mutate(order_rank = case_when(
+    end.x == 37017505 ~ 1,
+    start.x == 37017600 ~ 2,
+    event_class == "exon skipping" ~ 3,
+    TRUE ~ 4
+  )) %>%
+  arrange(sample, order_rank) %>%
+  dplyr::select(-order_rank)
+```
+
+```{r}
+onerow_per_sample_exon10 <- combined_filteredtissues_ordered_exon10 %>%
+  dplyr::group_by(sample) %>%
+  dplyr::summarise(
+    inc_9_10 = read_counts[junction_type == "9_10"],
+    inc_10_11 = read_counts[junction_type == "10_11"],
+    total_inclusion = sum(
+      read_counts[junction_type == "9_10"] +
+      read_counts[junction_type == "10_11"],
+      na.rm = TRUE
+    ),
+    skipping = read_counts[junction_type == "9_11"],
+    SEX = gtex.sex[!is.na(gtex.sex)][1],
+    AGE = gtex.age[!is.na(gtex.age)][1],
+    SUBJID = gtex.subjid[!is.na(gtex.subjid)][1],
+    SMTSD = gtex.smtsd[!is.na(gtex.smtsd)][1],
+    bc_auc.all_reads_annotated_bases =
+      recount_qc.bc_auc.all_reads_annotated_bases[!is.na(recount_qc.bc_auc.all_reads_annotated_bases)][1],
+    `star.uniquely_mapped_reads_%_both` = `recount_qc.star.uniquely_mapped_reads_._both`[!is.na(`recount_qc.star.uniquely_mapped_reads_._both`)][1],
+    junction_avg_coverage = recount_qc.junction_avg_coverage[!is.na(recount_qc.junction_avg_coverage)][1],
+    RIN_number = gtex.smrin[!is.na(gtex.smrin)][1],
+    Nucleic_acid_isolation_batch = gtex.smnabtch[!is.na(gtex.smnabtch)][1],
+    Genotype_or_expression_batch = gtex.smgebtch[!is.na(gtex.smgebtch)][1],
+    Classification_death = gtex.dthhrdy[!is.na(gtex.dthhrdy)][1],
+    
+    .groups = "drop"
+  )
+```
+
+```{r}
+replicates_exon10 <- onerow_per_sample_exon10 %>%
+  group_by(SUBJID, SMTSD) %>%
+  filter(n() >= 2) %>%
+  ungroup()
+```
+
+```{r}
+merged_onerow_per_sample_exon10 <- onerow_per_sample_exon10 %>%
+  left_join(
+    mlh1_alltissues_cpm %>%
+      dplyr::select(sample_id, mlh1_cpm, raw_counts),
+    by = c("sample" = "sample_id")
+  )
+
+```
+
+```{r}
+merged_onerow_per_sample_exon10$AGE <- as.factor(merged_onerow_per_sample_exon10$AGE)
+merged_onerow_per_sample_exon10$SEX <- as.factor(merged_onerow_per_sample_exon10$SEX)
+merged_onerow_per_sample_exon10$Classification_death <- as.factor(merged_onerow_per_sample_exon10$Classification_death)
+```
+
+```{r}
+quantile(merged_onerow_per_sample_exon10$total_inclusion, probs = c(0.1, 0.25, 0.5, 0.75))
+```
+```{r}
+merged_onerow_per_sample_exon10_filtered <- merged_onerow_per_sample_exon10 %>%
+  filter(total_inclusion > 20)
+```
+
+```{r}
+table(merged_onerow_per_sample_exon10$SMTSD)
+# look how many samples per tissue are left over after filtering
+
+table(merged_onerow_per_sample_exon10_filtered$SMTSD)
+# look how many samples per tissue are left over after filtering
+```
+
+```{r}
+saveRDS(merged_onerow_per_sample_exon10_filtered, file = "merged_onerow_per_sample_exon10_filtered.rds")
+saveRDS(merged_onerow_per_sample_exon10, file = "merged_onerow_per_sample_exon10.rds")
+```
+
+```{r}
+merged_onerow_per_sample_exon10 <- readRDS("merged_onerow_per_sample_exon10.rds")
+```
+
+
+```{r}
+# unfiltered model without all the covariats (simplest model)
+
+simplest_model_exon10 <- glmmTMB(
+  cbind(skipping, total_inclusion) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    (1 | SUBJID),
+  
+  family = betabinomial(),
+  data = merged_onerow_per_sample_exon10
+)
+
+emm_tmb_simplest_model_exon10 <- emmeans(simplest_model_exon10, ~ SMTSD)
+pairs_tmb_simplest_model_exon10 <- pairs(emm_tmb_simplest_model_exon10, adjust = "BH")
+simplest_model_exon10
+pairs_tmb_simplest_model_exon10
+```
+
+```{r}
+emm_thisplot_simplest_model_exon10 <- emmeans(simplest_model_exon10, ~ SMTSD, type = "response")
+emm_thisplot_simplest_model_exon10_df <- as.data.frame(emm_thisplot_simplest_model_exon10)
+breast_prob_simplest_model_exon10 <- emm_thisplot_simplest_model_exon10_df$prob[emm_thisplot_simplest_model_exon10_df$SMTSD == "Breast - Mammary Tissue"]
+
+emm_thisplot_simplest_model_exon10_df <- emm_thisplot_simplest_model_exon10_df %>%
+  mutate(
+    fold_vs_breast = breast_prob_simplest_model_exon10 / prob
+  )
+```
+
+```{r}
+# simplest model + RIN number -> now main model
+mainmodel_exon10 <- glmmTMB(
+  cbind(skipping, total_inclusion) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    RIN_number +
+    (1 | SUBJID),
+  
+  family = betabinomial(),
+  data = merged_onerow_per_sample_exon10
+)
+
+emm_tmb_mainmodel_exon10 <- emmeans(mainmodel_exon10, ~ SMTSD)
+pairs_tmb_mainmodel_exon10 <- pairs(emm_tmb_mainmodel_exon10, adjust = "BH")
+mainmodel_exon10
+pairs_tmb_mainmodel_exon10
+```
+
+```{r}
+emm_exon10 <- emmeans(mainmodel_exon10, ~ SMTSD)
+levels(mainmodel_exon10$data$SMTSD)
+contr_exon10 <- contrast(emm_exon10, method = "trt.vs.ctrl", ref = "Breast - Mammary Tissue", reverse = TRUE)
+summary(contr_exon10, adjust = "BH")
+```
+
+
+```{r}
+emm_thisplot_mainmodel_exon10 <- emmeans(mainmodel_exon10, ~ SMTSD, type = "response")
+emm_thisplot_mainmodel_exon10_df <- as.data.frame(emm_thisplot_mainmodel_exon10)
+breast_prob_mainmodel_exon10 <- emm_thisplot_mainmodel_exon10_df$prob[emm_thisplot_mainmodel_exon10_df$SMTSD == "Breast - Mammary Tissue"]
+
+emm_thisplot_mainmodel_exon10_df <- emm_thisplot_mainmodel_exon10_df %>%
+  mutate(
+    fold_vs_breast = breast_prob_mainmodel_exon10 / prob
+  )
+```
+
+```{r}
+# unfiltered model with the technical and expression covariats
+model_tmb_exon10_covariats_recount3 <- glmmTMB(
+  cbind(skipping, total_inclusion) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    scale(bc_auc.all_reads_annotated_bases) +
+    scale(`star.uniquely_mapped_reads_%_both`) +
+    scale(junction_avg_coverage) +
+    scale(mlh1_cpm) + 
+    (1 | SUBJID),
+  
+  family = betabinomial(),
+  data = merged_onerow_per_sample_exon10
+)
+
+emm_tmb_exon10_covariats_recount3 <- emmeans(model_tmb_exon10_covariats_recount3, ~ SMTSD)
+pairs_tmb_exon10_covariats_recount3 <- pairs(emm_tmb_exon10_covariats_recount3, adjust = "BH")
+model_tmb_exon10_covariats_recount3
+pairs_tmb_exon10_covariats_recount3
+```
+
+```{r}
+emm_thisplot_exon10_covariats_recount3 <- emmeans(model_tmb_exon10_covariats_recount3, ~ SMTSD, type = "response")
+emm_thisplot_exon10_covariats_df_recount3 <- as.data.frame(emm_thisplot_exon10_covariats_recount3)
+breast_prob_exon10_covariats_recount3 <- emm_thisplot_exon10_covariats_df_recount3$prob[emm_thisplot_exon10_covariats_df_recount3$SMTSD == "Breast - Mammary Tissue"]
+
+emm_thisplot_exon10_covariats_df_recount3 <- emm_thisplot_exon10_covariats_df_recount3 %>%
+  mutate(
+    fold_vs_breast = breast_prob_exon10_covariats_recount3 / prob
+  )
+```
+
+```{r}
+# compare models
+emm_thisplot_simplest_model_exon10_df
+emm_thisplot_mainmodel_exon10_df
+emm_thisplot_exon10_covariats_df_recount3
+```
+
+```{r}
+summary(simplest_model_exon10)
+summary(mainmodel_exon10)
+summary(model_tmb_exon10_covariats_recount3)
+```
+
+```{r}
+exon10_dist_exact_base_recount3 <- merged_onerow_per_sample_exon10 %>%
+  mutate(
+    skipping_capped = ifelse(skipping >= 10, "10+", as.character(skipping))
+  ) %>%
+  group_by(SMTSD, skipping_capped) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(SMTSD) %>%
+  mutate(
+    total_tissue = sum(n),
+    pct = 100 * n / total_tissue
+  )
+
+ggplot(
+  exon10_dist_exact_base_recount3,
+  aes(
+    x = factor(skipping_capped,
+               levels = c(as.character(0:9), "10+")),
+    y = pct
+  )
+) +
+  geom_col(fill = "steelblue", width = 1.0) +
+  geom_text(
+    aes(label = sprintf("%.1f%%", pct)),
+    vjust = -0.3,
+    size = 1.5
+  ) +
+  facet_wrap(~ SMTSD) +
+  theme_classic() +
+  labs(
+    x = "Exon 9 skipping read count",
+    y = "Percentage of samples within tissue"
+  ) +
+  ylim(0, max(exon10_dist_exact_base_recount3$pct) * 1.1)
+```
+
+```{r}
+exon10_dist_exact_base_recount3 <- merged_onerow_per_sample_exon10 %>%
+  mutate(
+    psi_sum = skipping / (skipping + total_inclusion),
+    psi_bin = cut(
+      psi_sum,
+      breaks = c(
+        0,
+        0.001,
+        0.005,
+        0.01,
+        0.02,
+        0.05,
+        0.1,
+        0.2,
+        1
+      ),
+      include.lowest = TRUE
+    )
+  ) %>%
+  group_by(SMTSD, psi_bin) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(SMTSD) %>%
+  mutate(pct = 100 * n / sum(n))
+
+ggplot(exon10_dist_exact_base_recount3, aes(x = psi_bin, y = pct)) +
+  geom_col(fill = "steelblue", width = 1) +
+  geom_text(
+    aes(label = sprintf("%.1f%%", pct)),
+    vjust = -0.3,
+    size = 1.8
+  ) +
+  facet_wrap(~ SMTSD) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 5, angle = 45, hjust = 1)) +
+  labs(
+    x = "PSI bin",
+    y = "Percentage of samples within tissue"
+  ) +
+  ylim(0, max(exon10_dist_exact_base_recount3$pct) * 1.1)
+```
+
+```{r}
+pairs_tmb_mainmodel_exon10_df <- as.data.frame(pairs_tmb_mainmodel_exon10)
+
+# Filter Breast comparisons
+pairs_tmb_mainmodel_exon10_df <- pairs_tmb_mainmodel_exon10_df %>%
+  filter(grepl("Breast - Mammary Tissue", contrast))
+
+# Compute effects + significance + modified labels
+pairs_tmb_mainmodel_exon10_df <- pairs_tmb_mainmodel_exon10_df %>%
+  mutate(
+    odds_ratio = exp(estimate),
+    percent_difference = (odds_ratio - 1) * 100,
+    lower_ci = (exp(estimate - 1.96 * SE) - 1) * 100,
+    upper_ci = (exp(estimate + 1.96 * SE) - 1) * 100,
+
+    sig = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE ~ ""
+    ),
+
+    # clean tissue label + add stars
+    tissue = gsub(".*Breast - Mammary Tissue - ", "", contrast),
+    tissue = paste0(tissue, sig)
+  )
+
+# Plot with stars in labels
+ggplot(pairs_tmb_mainmodel_exon10_df,
+       aes(x = percent_difference, y = reorder(tissue, percent_difference))) +
+  geom_point(size = 3) +
+  geom_errorbarh(
+    aes(xmin = lower_ci, xmax = upper_ci),
+    height = 0.2
+  ) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  theme_minimal() +
+  labs(
+    x = "Percent difference in exon skipping odds vs Breast",
+    y = "Tissue"
+  )
+```
+
+```{r}
+pairs_df_exon10 <- as.data.frame(summary(contr_exon10, adjust = "BH"))
+
+pairs_df_exon10 <- pairs_df_exon10 %>%
+  mutate(
+    odds_ratio = exp(estimate),
+    percent_difference = odds_ratio,
+
+    lower_ci = exp(estimate - 1.96 * SE),
+    upper_ci = exp(estimate + 1.96 * SE),
+
+    sig = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE ~ ""
+    ),
+
+    # extract tissue name (Breast is already reference direction)
+    tissue = gsub("Breast - Mammary Tissue - ", "", contrast),
+    tissue = paste0(tissue, sig)
+  )
+pairs_df_exon10 <- pairs_df_exon10 %>%
+  mutate(
+    tissue = contrast,
+
+    # remove only "(" and ")" but keep text
+    tissue = gsub("[()]", "", tissue),
+
+    tissue = trimws(tissue)
+  )
+pairs_df_exon10 <- pairs_df_exon10 %>%
+  mutate(
+    tissue = gsub("Colon - Sigmoid", "Colon (Sig)", tissue),
+    tissue = gsub("Colon - Transverse", "Colon (Trans)", tissue),
+    tissue = gsub("Small Intestine - Terminal Ileum", "SI (Ileum)", tissue),
+
+    # optional simplifications
+    tissue = gsub("Whole Blood", "Blood", tissue),
+    tissue = gsub("Breast - Mammary Tissue", "Breast", tissue)
+  )
+pairs_df_exon10 <- pairs_df_exon10 %>%
+  mutate(
+    tissue = paste0(tissue, sig)
+  )
+    
+ggplot(pairs_df_exon10,
+       aes(x = odds_ratio,
+           y = reorder(tissue, odds_ratio))) +
+  geom_point(size = 3) +
+  geom_errorbarh(
+    aes(xmin = lower_ci, xmax = upper_ci),
+    height = 0.2
+  ) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 12),  # tissue labels
+    axis.text.x = element_text(size = 12)   # x-axis labels (optional)
+  ) +
+  labs(
+    x = "odds ratio's Breast/Tissue X",
+    y = "Tissue"
+  )
+```
+
+```{r}
+# this plot needs to be made with inc_11_12, not total_inclusion for a better psi
+emm_resp_mainmodel_exon10 <- summary(emm_tmb_mainmodel_exon10, type = "response")
+emm_resp_mainmodel_exon10_df <- as.data.frame(emm_resp_mainmodel_exon10)
+ggplot(emm_resp_mainmodel_exon10_df, aes(x = reorder(SMTSD, prob), y = prob)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.2) +
+  coord_flip() +
+  labs(
+    x = "Tissue",
+    y = "Predicted exon skipping proportion",
+    title = "MLH1 exon skipping across tissues"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+model_tmb_exon10_intron9_mainmodel <- glmmTMB(
+  cbind(skipping, inc_9_10) ~ 
+    SMTSD + 
+    SEX + 
+    AGE +
+    RIN_number +
+    (1 | SUBJID),
+  
+  family = betabinomial(),
+  data = merged_onerow_per_sample_exon10
+)
+
+emm_tmb_exon10_intron9_mainmodel <- emmeans(model_tmb_exon10_intron9_mainmodel, ~ SMTSD)
+pairs_tmb_exon10_intron9_mainmodel <- pairs(emm_tmb_exon10_intron9_mainmodel, adjust = "BH")
+model_tmb_exon10_intron9_mainmodel
+pairs_tmb_exon10_intron9_mainmodel
+```
+
+```{r}
+emm_thisplot_exon10_intron9_mainmodel <- emmeans(model_tmb_exon10_intron9_mainmodel, ~ SMTSD, type = "response")
+emm_thisplot_exon10_intron9_mainmodel_df <- as.data.frame(emm_thisplot_exon10_intron9_mainmodel)
+breast_prob_exon10_intron9_mainmodel <- emm_thisplot_exon10_intron9_mainmodel_df$prob[emm_thisplot_exon10_intron9_mainmodel_df$SMTSD == "Breast - Mammary Tissue"]
+
+emm_thisplot_exon10_intron9_mainmodel_df <- emm_thisplot_exon10_intron9_mainmodel_df %>%
+  mutate(
+    fold_vs_breast = breast_prob_exon10_intron9_mainmodel / prob
+  )
+emm_thisplot_exon10_intron9_mainmodel_df
+```
+
+```{r}
+emm_resp_exon10_intron9_mainmodel <- summary(emm_tmb_exon10_intron9_mainmodel, type = "response")
+emm_response_exon10_intron9_mainmodel_df <- as.data.frame(emm_resp_exon10_intron9_mainmodel)
+ggplot(emm_response_exon10_intron9_mainmodel_df, aes(x = reorder(SMTSD, prob), y = prob)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.2) +
+  coord_flip() +
+  labs(
+    x = "Tissue",
+    y = "Predicted exon skipping proportion",
+    title = "MLH1 exon skipping across tissues"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+library(DHARMa)
+
+sim_res_exon10 <- simulateResiduals(mainmodel_exon10)
+plot(sim_res_exon10)
+```
+
+```{r}
+testOutliers(sim_res_exon10, type = "bootstrap")
+```
+
+```{r}
+plotResiduals(sim_res_exon10, merged_onerow_per_sample_exon10$SMTSD)
+plotResiduals(sim_res_exon10, merged_onerow_per_sample_exon10$RIN_number)
+```
+
+```{r}
+testDispersion(sim_res_exon10)
+```
+
+```{r}
+testZeroInflation(sim_res_exon10)
+```
+
+
+
+
